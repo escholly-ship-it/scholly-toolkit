@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "scholly-toolkit",
+  "description": "Schollys private Marketplace mit Sprint-Zeremonien, Experten-Team, Enforcement-Gates und Projekt-Management",
+  "owner": {
+    "name": "Torsten Schollmayer",
+    "email": "escholly@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "scholly-toolkit",
+      "description": "Sprint-Zeremonien (start/review/retro), Experten-Team als Agents, Enforcement-Hooks, /deploy-verify, /design-gate, /roadmap",
+      "version": "1.0.0",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/escholly-ship-it/cowork"
+    }
+  ]
+}
