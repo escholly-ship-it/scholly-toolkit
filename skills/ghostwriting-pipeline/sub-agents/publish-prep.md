@@ -39,7 +39,24 @@ Technisch:
 
 ## Schritt 2: latest-draft.json + ghostwriting-dashboard
 
-Patche `~/projects/ghostwriting-dashboard/data/latest-draft.json`:
+**Cloud-Mode (Sprint 257, CLOUD-P4-Sub-4):** Statt lokalem `git commit + git push` direkt aus dem Runner heraus, schreibt der Pipeline-Schritt das JSON via `/api/hook-relay` git-commit-Subtype:
+
+```
+POST /api/hook-relay {
+  type: "git-commit",
+  repo: "escholly-ship-it/ghostwriting-dashboard",
+  files: [
+    { path: "data/latest-draft.json", content_base64: "<base64-json>" }
+  ],
+  commit_message: "draft: <date>-<slug> - <internal-title>"
+}
+```
+
+Der Endpoint nutzt das Vercel-`GITHUB_TOKEN` mit Contents:write-Permission und committed via GitHub-API. Der Husky-Guard `guard-latest-draft.sh` blockiert Direct-Pushes — der API-Pfad umgeht den Pre-Commit-Hook (clean, da kein lokaler Working-Tree). Vercel Auto-Deploy zieht den Push automatisch.
+
+**Voraussetzung:** `escholly-ship-it/ghostwriting-dashboard` muss in der `ALLOWED_REPOS`-Liste in hook-relay/route.ts eingetragen sein. Bei 400-Antwort: PR auf Roadmap-Repo aufmachen + Repo zur Whitelist hinzufuegen.
+
+**Lokal-Mode (Backup, falls API-Pfad failed):** Patche `~/projects/ghostwriting-dashboard/data/latest-draft.json`:
 ```json
 {
   "title": "<draft-title>",
@@ -58,13 +75,17 @@ Patche `~/projects/ghostwriting-dashboard/data/latest-draft.json`:
 }
 ```
 
-Commit + push ghostwriting-dashboard:
+Commit + push ghostwriting-dashboard (Lokal-Mode):
 ```bash
 cd ~/projects/ghostwriting-dashboard
 git add data/latest-draft.json
-git commit -m "draft: <date>-<slug> - <internal-title>"
+SYNC_DASHBOARD_STATUS=1 git commit -m "draft: <date>-<slug> - <internal-title>"
 git push
 ```
+
+**Hinweis:** `SYNC_DASHBOARD_STATUS=1` umgeht den Husky-Guard `guard-latest-draft.sh` (GW-81). Der Pipeline-Lauf wird so dokumentiert dass das ein bekannter Pfad ist (NICHT als Notausgang).
+
+**Cloud-Mode (bevorzugt seit Sprint 257):** API-Variante oben verwenden — kein Notausgang, kein lokaler Working-Tree noetig.
 
 ## Schritt 3: Google Calendar Event (Performance-Reminder 72h)
 

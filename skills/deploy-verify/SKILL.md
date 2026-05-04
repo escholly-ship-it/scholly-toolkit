@@ -8,7 +8,23 @@ argument-hint: [projekt-name]
 
 **Projekt:** $ARGUMENTS
 
-**Git-Status:** !`git log --oneline -3 2>/dev/null || echo "Kein Git-Repo"`
+## Cloud-Mode (Sprint 257, CC-CLOUD-MIGRATION)
+
+Cloud-Sessions koennen die volle Verifikation per API durchfuehren statt mit lokalem `git log` + `curl`:
+
+```
+POST /api/deploy-verify {
+  project: "<projekt-name>",
+  url: "https://<projekt>.vercel.app",
+  expected_sha?: "<sha von letzter commit>"
+}
+```
+
+Antwort enthaelt `{ok, health, status_code, elapsed_ms, body_preview, sha_match}`. Wenn `sha_match=false` ist der Deploy noch nicht durch — kurz warten + wiederholen.
+
+Lokal: bestehender Block laeuft.
+
+**Git-Status (lokal):** !`git log --oneline -3 2>/dev/null || echo "Kein Git-Repo"`
 
 ## Pflicht nach JEDEM git push der Auto-Deploy triggert (Regel 16)
 

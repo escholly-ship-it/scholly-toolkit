@@ -5,13 +5,25 @@ description: Sprint-Zeremonie Phase E — Qualitaetssicherung + Kunden-Abnahme (
 
 # Phase E — Review (Qualitaetssicherung + Kunden-Abnahme)
 
+## Cloud-Mode (Sprint 257, CC-CLOUD-MIGRATION)
+
+Cloud-Sessions nutzen `cloud-mode-skill-patterns.md` — Phase-State-Marker via `/api/phase-state`, Telegram-Push via `/api/notify-scholly`, Deploy-Verify via `/api/deploy-verify`, Auto-Migrate-Tag via `/api/hook-relay`. Detection: wenn Bash-Tool nicht verfuegbar, alternative API-Calls verwenden. Lokale Marker bleiben Default.
+
 **CC-271 (Sprint 226) — skill-review-invoked Marker PFLICHT:** Als ERSTE Aktion diesen Skills setzen:
+
+**Lokal:**
 ```bash
 SPRINT_TAG=$(cat ~/Cowork/.current-sprint-tag 2>/dev/null | tr -d '[:space:]')
 MARKERS_DIR="$HOME/Cowork/.phase-markers/$SPRINT_TAG"
 echo done > "$MARKERS_DIR/skill-review-invoked"
 ```
-Ohne diesen Marker blockiert phase-gate.sh den E=done-Write. Freihand-Review (ohne Skill-Invocation) ist damit technisch unmoeglich.
+
+**Cloud:**
+```
+PATCH /api/phase-state {session_id, markers: {"skill-review-invoked": "done"}}
+```
+
+Ohne diesen Marker blockiert phase-gate.sh (lokal) bzw. `POST /api/hook-relay {type: "phase-gate"}` (Cloud) den E=done-Write. Freihand-Review (ohne Skill-Invocation) ist damit technisch unmoeglich.
 
 **CC-325 (Sprint 234) — TTL-Refresh PFLICHT bei Stretch-Sprints:** Direkt nach skill-review-invoked-Marker ALLE Phase-Marker `touch`-en. Verhindert TTL-Block bei Sprints >6h (a-*, b-*, c-*, d-* Marker waeren sonst stale).
 ```bash
@@ -288,19 +300,14 @@ Initiativen-Definition liegt im API-Endpoint + Skript (`INITIATIVES`-Liste in `c
 **"OK" zur Abnahme, sonst konkrete Kritik.**
 ```
 
-Telegram-Push (AUTO-10) SOFORT nach Block:
-```bash
-bash ~/Cowork/scripts/notify-scholly.sh kunden-abnahme "Sprint $(cat ~/Cowork/.sprint-global) — Abnahme noetig. Proof im Chat."
+**Mobile-Push (Sprint 261 PushNotification-Migration):** SOFORT nach Block:
+```
+PushNotification(status: 'proactive', message: 'Sprint <N> — Lieferung zur Abnahme. Proof im Chat. OK oder Korrektur antworten.')
 ```
 
-**Cloud-Mode-Fallback (CC-382, Sprint 247):** Bei Cloud-Sessions ohne Bash:
-```
-POST https://roadmap-escholly-ship-its-projects.vercel.app/api/notify-scholly
-Authorization: Bearer <API_TOKEN>
-Body: {"type":"kunden-abnahme","message":"Sprint X — Abnahme noetig. Proof im Chat.","sprint":<n>}
-```
+Anthropic-natives Tool — pingt direkt auf Mobile-App. KEIN notify-scholly mehr (Bash + HTTP-Endpoint sind Noop seit Sprint 261).
 
-**STILLE PAUSE = SKILL-VERSTOSS.** Push MUSS raus VOR dem [wartet auf Scholly]-Block. Heute bei Kritik-Fix-Schleifen ebenfalls: jede Klaerungs-Frage an Scholly braucht erst `notify-scholly.sh phase-wait "..."`.
+**STILLE PAUSE = SKILL-VERSTOSS.** Push MUSS raus VOR dem [wartet auf Scholly]-Block. Bei Kritik-Fix-Schleifen ebenfalls: jede Klaerungs-Frage an Scholly braucht erst `PushNotification(status: 'proactive', message: 'Sprint X Phase Y — Klaerung: <1-Satz>')`.
 
 Bei Kritik sofort fixen.
 

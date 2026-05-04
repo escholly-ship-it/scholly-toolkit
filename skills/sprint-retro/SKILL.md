@@ -8,6 +8,19 @@ description: Sprint-Zeremonie Phase F+G — Retro reflektieren, Experten-Persona
      beim Sprint-Start, ab da autonom"). Retro laeuft im am Sprint-Start
      gewaehlten Modell durch. -->
 
+## Cloud-Mode (Sprint 257, CC-CLOUD-MIGRATION)
+
+Cloud-Sessions nutzen `cloud-mode-skill-patterns.md`:
+- Phase-State-Marker (`skill-retro-invoked`, `g-*`, `f-*`) via `PATCH /api/phase-state`
+- Memory-Updates via `POST /api/hook-relay {type: "git-commit", repo: "escholly-ship-it/claude-config", files: [...]}`
+- Cowork-Memory via `POST /api/hook-relay {type: "git-commit", repo: "escholly-ship-it/cowork", files: [...]}`
+- Telegram-Push am Sprint-Ende via `POST /api/notify-scholly {type: "sprint-end"}`
+- Sprint-Counter-Inkrement bleibt zentral via `POST /api/sync` (existiert seit Sprint 138)
+
+Lokale Bash-Schritte bleiben Default. Detection beim ersten Bash-Block-Versuch.
+
+---
+
 ## ⚠️ FREIHAND-VERBOT (Regel 95, Sprint 176 Incident — CC-185)
 
 Phase F und Phase G laufen **AUSSCHLIESSLICH** via diesen Skill. Bash-Freihand ist verboten, auch in Auto Mode.
@@ -399,6 +412,8 @@ Offene Entscheidungen werden beim naechsten `/sprint-start` automatisch angezeig
 
 **CC-212 (Sprint 194): Beide Repos parallel pushen — spart ~50% Zeit gegenueber sequentiellem Push.**
 
+### Lokal-Mode (Default)
+
 ```bash
 # Commits vorbereiten (sequenziell, kein Race auf staging)
 cd ~/.claude && git add -A projects/-Users-scholly/memory/ CLAUDE.md settings.json hooks/ skills/ && git commit -m "Backup nach [Projekt] Sprint [Nr]" 2>&1 | tail -2 || echo "(keine Memory-Aenderungen)"
@@ -408,6 +423,31 @@ cd ~/Cowork && git add -A && git commit -m "Backup nach [Kontext]" 2>&1 | tail -
 (cd ~/.claude && git push &) ; (cd ~/Cowork && git push &) ; wait
 echo "✅ Beide Repos gepusht"
 ```
+
+### Cloud-Mode (CLOUD-P4-Sub-3, Sprint 256)
+
+In Cloud-Sessions ist `git push` nicht moeglich — kein Filesystem-Zugriff auf `~/.claude/` und `~/Cowork/`. Stattdessen: Memory-Updates wurden waehrend der Session **direkt** ueber Write-/Edit-Tools auf dem virtuellen Workspace gemacht; der Backup-Pfad nutzt den `git-commit`-Hook-Relay-Endpoint, der per GitHub-API committet.
+
+Pflicht-Sequenz:
+1. Skill-Tool **diff sammeln** — alle waehrend der Session geschriebenen Memory-/Cowork-Files identifizieren (TodoWrite + Edit-Tool-Audit-Log).
+2. Pro Datei `content_base64` erzeugen (im Tool-Call inline).
+3. Aufruf:
+   ```
+   POST https://roadmap-escholly-ship-its-projects.vercel.app/api/hook-relay
+   Authorization: Bearer <ROADMAP_API_TOKEN>
+   Body:
+   {
+     "type": "git-commit",
+     "repo": "escholly-ship-it/cowork",
+     "branch": "main",
+     "files": [{"path": "memory/...", "content_base64": "..."}],
+     "commit_message": "Backup nach [Projekt] Sprint [Nr] (Cloud-Retro)"
+   }
+   ```
+4. Erwartete Antwort: `{ ok: true, commits: [...], errors: [] }`. Bei `503` mit `GITHUB_TOKEN not configured` → Setup-Aufgabe vorhanden, im Telegram-Push erwaehnen (kein Hard-Fail).
+5. Zweiter Aufruf fuer `escholly-ship-it/claude-config` (= `~/.claude/`-Repo).
+
+Whitelisted Repos: `escholly-ship-it/cowork`, `escholly-ship-it/claude-config`. Pfade duerfen nicht mit `/` beginnen oder `..` enthalten.
 
 **Nach Backup:**
 ```bash
@@ -446,16 +486,11 @@ Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases` die Zeile `G=` auf `G=do
 
 **Findings** → Beheben via PATCH `/api/items`, dann erneut pruefen.
 
-**Telegram-Push (AUTO-10, Sprint 176 / Cloud-Mode CC-382, Sprint 247):** Nach G=done:
-```bash
-bash ~/Cowork/scripts/notify-scholly.sh sprint-end "Sprint $(cat ~/Cowork/.sprint-global) fertig — neue Session starten"
+**Mobile-Push (Sprint 261 PushNotification-Migration):** Nach G=done:
+```
+PushNotification(status: 'proactive', message: 'Sprint <N> fertig. Geliefert: <3-Bullet-Kurz>. Neue Session kann starten.')
 ```
 
-**Cloud-Mode-Fallback** (kein Bash):
-```
-POST https://roadmap-escholly-ship-its-projects.vercel.app/api/notify-scholly
-Authorization: Bearer <API_TOKEN>
-Body: {"type":"sprint-end","message":"Sprint X fertig. Geliefert: [3-Bullet-Zusammenfassung]. Neue Session kann starten.","sprint":<n>}
-```
+Anthropic-natives Tool — pingt direkt auf Mobile-App. KEIN notify-scholly mehr (Bash + HTTP-Endpoint sind Noop seit Sprint 261).
 
 **INHALT (Regel 110, menschliche Sprache):** Sprint-End-Push ist KEIN Status-Geplapper — er enthaelt eine 3-Bullet-Zusammenfassung was geliefert wurde + 1-Satz-Aufforderung "neue Session starten". Beispiel: "Sprint 246 fertig. Geliefert: (1) Roadmap 2.0 Phase γ live, (2) Anti-Silent-Pause Hook, (3) Cookmark-Pre-Check. Du kannst eine neue Session starten."

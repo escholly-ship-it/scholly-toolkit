@@ -17,9 +17,25 @@ ROADMAP_TOKEN=$(cat ~/.roadmap-api-token 2>/dev/null)
 ```
 Danach bei jedem curl: `-H "Authorization: Bearer $ROADMAP_TOKEN"`
 
-## Cloud-Compat: Inline-Hook-Patterns (CC-391, Sprint 254)
+## Cloud-Compat: Inline-Hook-Patterns (CC-391, Sprint 254 + erweitert Sprint 257)
 
-**Cloud-Sessions unterstuetzen KEINE Bash-Hooks.** Folgende Checks sind als LLM-Self-Check kanonisch in diesem Skill verdrahtet. Lokale Bash-Hooks unter `~/.claude/hooks/` bleiben als Backup, sind aber NICHT pflicht.
+**Cloud-Sessions unterstuetzen KEINE Bash-Hooks UND KEIN lokales Filesystem.** Folgende Checks sind als LLM-Self-Check kanonisch in diesem Skill verdrahtet. Lokale Bash-Hooks unter `~/.claude/hooks/` bleiben als Backup, sind aber NICHT pflicht.
+
+**Detection (Cloud vs. Lokal):** Beim ersten Bash-Block-Versuch im Skill-Flow:
+- Bash-Tool verfuegbar → **Lokal-Mode** (bestehende Code-Bloecke laufen).
+- Bash-Tool nicht verfuegbar → **Cloud-Mode** (alternative API-Calls aus `cloud-mode-skill-patterns.md` Pattern 5-15 nutzen).
+
+**Cloud-Endpoints (Sprint 257):**
+- `/api/phase-state` — Phase-Marker + State (ersetzt `~/Cowork/.phase-markers/<id>/`)
+- `/api/sprint-cache` — verify+items+konzept Cache (ersetzt `.sprint-start-cache-<id>.json`)
+- `/api/memory-read` — Memory-Files aus claude-config (ersetzt Read-Tool auf `~/.claude/projects/.../memory/`)
+- `/api/research-validate` — Persona-Freshness (ersetzt `validate-research.sh`)
+- `/api/git-status` — Repo-Remote-HEAD (ersetzt `git-status-gate.sh` Lese-Variante)
+- `/api/deploy-verify` — Health+SHA-Check (ersetzt `/deploy-verify` Skill-Bash)
+- `/api/notify-scholly` — Telegram-Push (ersetzt `notify-scholly.sh`)
+- `/api/hook-relay` — Phase-Gate + Auto-Migrate-Tag + Stop-Silent
+
+Volle Pattern-Tabelle: siehe Memory-File `cloud-mode-skill-patterns.md` (Patterns 5-15 mit Lokal↔Cloud-Translation).
 
 ### Pattern 1 — Tageszeit-Gruss (Regel 59, ersetzt `regel59-tageszeit.sh`)
 
@@ -81,8 +97,43 @@ Antwort liefert `action: pull|push|noop` + `source_tag/target_tag`.
 
 **Self-Test:** Tag-Drift simulieren (zwei `.sprint-phases-*`-Files mit unterschiedlicher Marker-Anzahl) → Skill identifiziert reicheren Tag und uebernimmt dessen Marker.
 
+### Pattern 5 — Tool-Failure-LLM-Self-Check (CLOUD-TOOL-FAILURE-LLM-258, Sprint 258)
+
+**Trigger:** Nach jedem Tool-Call ueberpruefen.
+
+**Zweck:** auto10-post-tool-failure.sh ist ein PostToolUse-Hook der bei 3 Fehlversuchen in Folge eines Tools alarmiert. In Cloud-Sessions ohne Hooks uebernimmt der LLM diese Verantwortung selbst.
+
+**Self-Check pro Turn:**
+1. **Tracke Tool-Failures pro Tool im Turn-Verlauf:** Wenn ein Tool-Call eine Error-Response liefert (Felder `error`, `is_error`, oder Error-Keywords im content: `error:`, `failed`, `cannot connect`, `timeout`, `rate limit`, `5xx`, `429`, `503`, `502`, `504`), ist das ein Failure.
+2. **Counter:** mentaler Counter pro Tool-Name. Bei Success → Counter Reset. Bei Failure → Counter +1.
+3. **Bei Counter ≥ 3 desselben Tools in Folge:**
+   - SOFORT Telegram-Alert via `/api/notify-scholly` POST mit `{type:"tool-failure", message:"<tool> 3x gefailt: <error-summary>"}`.
+   - Counter zurueckcetzen.
+   - Im Chat 1-Satz an Scholly: "⚠️ <Tool> hat 3x gefailt — Telegram-Alert raus, Diagnose-Pause."
+   - **STOP** des aktuellen Workflows. Diagnose vor weiterem Versuch.
+
+**Cloud-Mode Implementation:**
+```
+POST https://roadmap-escholly-ship-its-projects.vercel.app/api/notify-scholly
+Authorization: Bearer <ROADMAP_API_TOKEN>
+Body: {"type":"tool-failure","message":"<tool> 3x gefailt: <last-error>","sprint":<n>}
+```
+
+**Lokal-Backup:** PostToolUse-Hook `~/.claude/hooks/auto10-post-tool-failure.sh` laeuft parallel als Defense-in-Depth.
+
+**Self-Test:** Bash-Tool dreimal mit garantiert fehlschlagenden Commands aufrufen (z.B. `false`, `exit 1`, `cat /nonexistent`) → 4. Tool-Call durch eigenen Stop ersetzen, Telegram-Alert verifizieren.
+
+**Wichtig:** Counter ist pro Tool-Name (nicht pro spezifischem Aufruf). 3x Bash-Failures auf verschiedenen Commands zaehlen kumulativ. Aber: 1x Bash-Fail + 1x Read-Fail + 1x Edit-Fail = jeweils Counter=1, kein Alert.
+
 ## Schritt 0: State-Reset + Sprint-Phase-State initialisieren (PFLICHT)
 Alte Marker UND Sprint-State aus dem vorherigen Sprint muessen geloescht werden, sonst greifen die Phase-Gates nicht.
+
+**Cloud-Mode (Sprint 257):** Statt FS-Marker laeuft alles via `/api/phase-state`:
+```
+DELETE /api/phase-state?session=<UUID>             # Reset
+POST   /api/phase-state {session_id, sprint, project: "tbd"}  # Init
+```
+session-UUID kommt aus der Cloud-Session-Frontmatter (gleich wie SPRINT_TAG-Konvention).
 
 **Session-isolierte Marker (CC-96 Sprint 148, CC-105 Sprint 154):** Marker werden IMMER unter `~/Cowork/.phase-markers/<session-id>/` isoliert. Session-ID kommt aus `session-start.sh` via `~/Cowork/.current-sprint-tag`. Legacy-Fallback auf globale Pfade wurde in Sprint 154 entfernt.
 ```bash
@@ -153,6 +204,12 @@ bash ~/.claude/skills/sprint-start/git-status-gate.sh
 ### Schritt 3b: Backlog-Hygiene verifizieren + API-Cache anlegen (Regel 88, CC-73)
 
 **CC-73 Optimierung (Sprint 155):** Statt 5x API-Call ueber die Session werden `/api/verify` + `/api/items` EINMAL hier parallel geladen und in ein Cache-File geschrieben. Schritte 4a und 4f lesen aus dem Cache.
+
+**Cloud-Mode (Sprint 257):** Statt FS-Cache wird `/api/sprint-cache` genutzt:
+```
+PUT /api/sprint-cache {session_id, verify: <verify-response>, items: <items-response>}
+```
+Schritt 4a/4f lesen via `GET /api/sprint-cache?session=<UUID>`.
 
 ```bash
 CACHE_FILE="$HOME/Cowork/.sprint-start-cache-$SPRINT_TAG.json"
@@ -459,9 +516,18 @@ Framework: `memory/experten-team-framework.md` Kapitel 3.
 **Marker:** `echo done > $MARKERS_DIR/a-experten`
 
 ### Schritt 5b: Research-Validierung (Regel 53) — PFLICHT
+
+**Lokal:**
 ```bash
 bash memory/validate-research.sh $(cat ~/Cowork/.sprint-global)
 ```
+
+**Cloud-Mode (Sprint 257):**
+```
+GET /api/research-validate?sprint=<n>
+```
+Antwort `{ ok, overdue: [...], warnings }`. Bei `ok=false` UND `overdue.length >= 5`: Im Phase-A-Output melden + LaunchAgent-Hinweis (lokal: `launchctl kickstart com.cowork.experten-research`).
+
 **Exit 1 = STOPP.** Typische Fehler: Datum statt Sprint-Nummer, due erhoeht ohne Research.
 
 ### Schritt 5b2: Weiterbildungs-Status (CC-77, Sprint 173 — entkoppelt via LaunchAgent)
@@ -618,11 +684,12 @@ Cross-Project-Learnings, archivierte Backlogs, abgeschlossene Einmal-Themen.
 
 **Logik fuer "Wechsel noetig?":** Wenn aktuelles Modell == empfohlenes Modell UND aktueller Effort == empfohlener Effort → "Nein, bereits korrekt". Sonst Ja.
 
-**Telegram-Push (AUTO-10, Sprint 176):** Nach Anzeige des Sprint-Ziel-Blocks SOFORT Push senden:
-```bash
-bash ~/Cowork/scripts/notify-scholly.sh sprint-goal "Sprint $(cat ~/Cowork/.sprint-global) — Ziel bestaetigen (<Projekt>, <N> Items)"
+**Mobile-Push (Sprint 261 — PushNotification-Migration):** Nach Anzeige des Sprint-Ziel-Blocks SOFORT Push direkt via Anthropic-natives Tool:
 ```
-So sieht Scholly auf Apple Watch dass Sprint-Start warten auf seine Abnahme.
+PushNotification(status: 'proactive', message: 'Sprint <N> — Ziel zur Abnahme: <1-Satz-Ziel>. Bestaetigen oder Anpassen.')
+```
+Anthropic-Push laeuft auf die Mobile-App (Voraussetzung: Remote Control gepairt + "Push when Claude decides" aktiv).
+**Telegram ist DEPRECATED** fuer Sprint-Trigger — der alte `notify-scholly.sh sprint-goal`-Aufruf ist Noop ab Sprint 261. Nicht mehr nutzen.
 
 **Regeln:**
 - **Ziel-Satz** muss sich aus Scope-Tabelle + Deliverables ableiten (keine neuen Inhalte).
@@ -726,33 +793,28 @@ Nach jedem `<phase>=done` darf der naechste Turn **NICHT** mit reinem Text enden
 
 ZUSAETZLICH zu den 3 geplanten Pushes T1/T2/T3 gibt es **ad-hoc Wartepunkte**, die jederzeit auftreten koennen — typisch in Phase A (Audit-Findings), aber auch in B/C/D wenn sich ein Item-Scope als unklar herausstellt:
 
-- **Phase-A Audit-Finding** (z.B. heute: BetterStack/Substack-Verwechslung, CC-326-Effort-Frage, A11y-Splittung) → **bevor du wartest** PFLICHT-Tool-Call:
-  ```bash
-  bash ~/Cowork/scripts/notify-scholly.sh audit-finding "Sprint $(cat ~/Cowork/.sprint-global) — Audit: [1-2 Saetze was geprueft werden muss]"
+- **Phase-A Audit-Finding** → **bevor du wartest** PFLICHT-Tool-Call (Sprint 261 PushNotification-Migration):
+  ```
+  PushNotification(status: 'proactive', message: 'Sprint <N> — Audit-Finding: <1-2 Saetze was geprueft werden muss>')
   ```
 - **Phase B/C/D Klaerung** (Item-Scope unklar, Architektur-Entscheidung) → PFLICHT-Tool-Call:
-  ```bash
-  bash ~/Cowork/scripts/notify-scholly.sh phase-wait "Sprint X Phase Y — brauche Entscheidung: [1 Satz worum es geht]"
   ```
-- **Cloud-Mode (kein Bash):** Statt notify-scholly.sh wird der HTTP-Endpoint aufgerufen:
+  PushNotification(status: 'proactive', message: 'Sprint <N> Phase <X> — brauche Entscheidung: <1 Satz worum es geht>')
   ```
-  POST https://roadmap-escholly-ship-its-projects.vercel.app/api/notify-scholly
-  Authorization: Bearer <API_TOKEN>
-  Body: {"type":"audit-finding"|"phase-wait","message":"...","sprint":<n>}
-  ```
-- **REGEL OHNE AUSNAHME:** Vor JEDEM "ich warte auf dich"-Moment im Chat MUSS ein Telegram-Push raus. Stille Pause = Skill-Verstoss. Heute wurde das verletzt (Sprint 247 Phase A) → strukturelle Haertung ist CC-382.
+- **DEPRECATED (Sprint 261):** `notify-scholly.sh` (Bash) und `/api/notify-scholly` (HTTP) sind Noop. KEIN Telegram-Push fuer Skill-Trigger mehr — `PushNotification`-Tool ist der einzig richtige Pfad.
+- **REGEL OHNE AUSNAHME:** Vor JEDEM "ich warte auf dich"-Moment im Chat MUSS ein `PushNotification` raus. Stille Pause = Skill-Verstoss.
 
 **KONKRETE PHASEN-TRANSITIONS (Cheatsheet):**
 
 | Von Phase | Pflicht-Tool-Calls am Ende | Naechster Schritt |
 |-----------|----------------------------|-------------------|
-| A done | a-* marker + State-File A=done + `phase-transition-notify A "..."` + validate-phase A | Phase B Plan via TodoWrite |
+| A done | a-* marker + State-File A=done + `PushNotification` Sprint-Goal + validate-phase A | Phase B Plan via TodoWrite |
 | B done | b-ideation marker + State-File B=done + validate-phase B (kein Push) | Phase C Write Konzept |
 | C done | c-planning marker + State-File C=done + validate-phase C (kein Push) | Phase D Code-Tool-Calls |
 | D done | d-execution marker + State-File D=done + validate-phase D (kein Push) | **`/sprint-review` Skill aufrufen** |
-| E done | e-* marker + Kunden-Abnahme-Push + validate-phase E | **`/sprint-retro` Skill aufrufen** |
+| E done | e-* marker + `PushNotification` Kunden-Abnahme + validate-phase E | **`/sprint-retro` Skill aufrufen** |
 | F done | f-* marker + State-File F=done + validate-phase F (kein Push) | Phase G via gleichem Skill |
-| G done | g-* marker + Sprint-End-Push + validate-phase G | Sprint fertig, neue Session |
+| G done | g-* marker + `PushNotification` Sprint-End + validate-phase G | Sprint fertig, neue Session |
 
 **MERKE:** Phase-Uebergang = mind. 4 Tool-Calls (Doku-Tool + Marker + State-Edit + Validate). Nur A/E/G zusaetzlich Telegram. Nach D MUSS `/sprint-review` aufgerufen werden, nach E `/sprint-retro`. Skill-Chain ist DETERMINISTISCH — keine Pause, keine Frage.
 

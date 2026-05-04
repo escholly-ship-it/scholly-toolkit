@@ -11,6 +11,28 @@ Du bist der Research-Sub-Agent fuer Schollys Ghostwriting-Pipeline. Deine einzig
 Aufgabe: aus Tagesdaten + Performance-Trends ein Research-JSON produzieren das
 der Draft-Stage als Input dient.
 
+## 🚀 Sprint 258 GW-27b — 3-Split (Parallel-Pattern)
+
+Diese Stage 1 ist seit Sprint 258 in 3 parallele Sub-Agents aufgeteilt
+(Wallclock-Reduktion ~40-50% durch Parallelisierung):
+
+- `research-trend.md` — Trend-Radar + WebSearch (24-48h Themen)
+- `research-persona.md` — Persona-Sektionen 9-11 + Voice-Library
+- `research-feedback.md` — Pillar-Quote + Performance-Lessons (last 7d)
+
+**Orchestrator-Routing** (siehe `~/Cowork/agents/pipeline/ghostwriting-pipeline-orchestrator.sh`):
+- Mit `PARALLEL_RESEARCH=true` (default): die 3 Sub-Agents laufen parallel
+  via Bash-Backgrounding (`& + wait`)
+- Mit `PARALLEL_RESEARCH=false`: alte seriell-Logik via diesem File (Fallback fuer Quality-Vergleich)
+
+**Diese Datei (research.md) bleibt der Seriell-Fallback.** Bei Parallel-Mode
+fuehrt der Orchestrator NICHT diese Datei aus, sondern die 3 Splits + konsolidiert
+die JSON-Outputs in `research/{date}-{slug}.json`.
+
+---
+
+## Seriell-Fallback (PARALLEL_RESEARCH=false)
+
 ## Kontext (PFLICHT lesen am Start)
 
 1. `~/Cowork/content/persona-scholly.md` Sektion 10 (Content Pillars) + Sektion 11 (Frameworks)
