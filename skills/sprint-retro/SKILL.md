@@ -494,3 +494,32 @@ PushNotification(status: 'proactive', message: 'Sprint <N> fertig. Geliefert: <3
 Anthropic-natives Tool — pingt direkt auf Mobile-App. KEIN notify-scholly mehr (Bash + HTTP-Endpoint sind Noop seit Sprint 261).
 
 **INHALT (Regel 110, menschliche Sprache):** Sprint-End-Push ist KEIN Status-Geplapper — er enthaelt eine 3-Bullet-Zusammenfassung was geliefert wurde + 1-Satz-Aufforderung "neue Session starten". Beispiel: "Sprint 246 fertig. Geliefert: (1) Roadmap 2.0 Phase γ live, (2) Anti-Silent-Pause Hook, (3) Cookmark-Pre-Check. Du kannst eine neue Session starten."
+
+## PFLICHT-FINAL-OUTPUT: Lokal-vs-Remote-Empfehlung naechster Sprint (Sprint 261 Scholly-Forderung 2026-05-04)
+
+**Bevor der Skill endet, MUSS dieser Block ausgegeben werden — keine Ausnahme.**
+
+```
+### Naechster Sprint (Sprint <N+1>) — Lokal oder Remote?
+
+**Verifikations-Status (was ist nötig fuer Cloud-Sessions):**
+| Pruefung | Status | Wo geprueft |
+|---|---|---|
+| Personal Skills hochgeladen (claude.ai/customize/skills) | ✅/❌ | Chrome MCP claude.ai/customize/skills |
+| GitHub PAT R+W + alle Repos | ✅/❌ | github.com/settings/personal-access-tokens |
+| Mobile-Push aktiv (R4 oder andere Routine hat heute Push gesendet) | ✅/❌ | Findings-Tracker letzte 24h |
+| Cloud-Smoke-Test in der Vergangenheit gruen | ✅/❌ | letzter erfolgreicher /sprint-start in Cloud-Session |
+
+**Empfehlung:** [REMOTE-FIRST | REMOTE-NUR-WENN-X | LOKAL-NUR]
+
+**Begruendung:** [1-Satz warum]
+
+**Falls REMOTE-FIRST und Cloud-Smoke-Test fehlschlaegt:** Fallback auf Mac-CLI im SELBEN Sprint-Versuch — KEIN Item-Verschieben, KEIN Sprint-Counter-Inkrement.
+```
+
+**Skill-Sync-Reminder:** Wenn dieser Skill seit der letzten Phase-G-Ausgabe geaendert wurde (lokal `~/.claude/skills/sprint-retro/SKILL.md`), MUSS der Sync-Pfad ausgegeben werden:
+1. Lokal aktualisiert: ✅ automatisch (Edit-Tool)
+2. scholly-toolkit Repo aktualisiert: pflicht `rsync + commit + push escholly-ship-it/scholly-toolkit`
+3. claude.ai Personal Skill: **MANUELLER RE-UPLOAD von ZIP noetig** — auf Desktop-Ordner ablegen + PushNotification an Scholly mit "Re-Upload nötig"
+
+Sprint-262-Item CC-SKILL-PERSONAL-SYNC-AUTO loest dieses Manuell-Friction-Problem.
