@@ -510,11 +510,22 @@ Anthropic-natives Tool — pingt direkt auf Mobile-App. KEIN notify-scholly mehr
 | Mobile-Push aktiv (R4 oder andere Routine hat heute Push gesendet) | ✅/❌ | Findings-Tracker letzte 24h |
 | Cloud-Smoke-Test in der Vergangenheit gruen | ✅/❌ | letzter erfolgreicher /sprint-start in Cloud-Session |
 
-**Empfehlung:** [REMOTE-FIRST | REMOTE-NUR-WENN-X | LOKAL-NUR]
+**Empfehlung:** [REMOTE-FIRST | LOKAL-DEFAULT-CLOUD-SMOKE-TEST-PARALLEL | LOKAL-NUR]
 
 **Begruendung:** [1-Satz warum]
 
-**Falls REMOTE-FIRST und Cloud-Smoke-Test fehlschlaegt:** Fallback auf Mac-CLI im SELBEN Sprint-Versuch — KEIN Item-Verschieben, KEIN Sprint-Counter-Inkrement.
+**Default ab Sprint-261-Entscheidung 2026-05-04:** LOKAL bis alle 7 Sicherheits-Kriterien aus `sprint-262-cloud-fallback-plan.md` grun sind. Cloud-Smoke-Test laeuft parallel zu Mac-CLI-Sprint, NICHT als Sprint-Vehikel.
+
+**Cloud-Migration-Status-Tracker (mind. 7 Kriterien dokumentieren):**
+1. Skill-Slash-Menu Cloud-Session [3x verifiziert?]
+2. Bootstrap-Skript exit 0 [3x?]
+3. /api/verify + /api/memory-read 200 [3x?]
+4. PushNotification Mobile [3x?]
+5. /api/memory-write Sprint-Retro [3x?]
+6. Voller Sprint-A-bis-G Cloud [1x?]
+7. Mac-aus-24h-Zyklus [1x?]
+
+Erst wenn ALLE 7 grun sind: REMOTE-FIRST erlaubt.
 ```
 
 **Skill-Sync-Reminder:** Wenn dieser Skill seit der letzten Phase-G-Ausgabe geaendert wurde (lokal `~/.claude/skills/sprint-retro/SKILL.md`), MUSS der Sync-Pfad ausgegeben werden:
