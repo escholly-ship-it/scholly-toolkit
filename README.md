@@ -1,51 +1,39 @@
-# scholly-toolkit
+# scholly-toolkit ⚠️ DEPRECATED
 
-Schollys privater Plugin-Marketplace fuer Claude Code — Sprint-Zeremonien, Experten-Team, Enforcement-Hooks und Projekt-Management.
+> **DEPRECATED ab 2026-05-06 (Sprint 265).**
+> Dieser Repo ist nicht mehr der primaere Distributions-Pfad fuer Cloud-Sessions.
 
-## Inhalt
+## Warum deprecated?
 
-- **Skills (10)** — `/sprint-start`, `/sprint-review`, `/sprint-retro`, `/deploy-verify`, `/design-gate`, `/roadmap`, `/go`, `/ghostwriting-pipeline`, `/claude-design-to-nextjs`, `/sync-skill-plugin-cache`
-- **Agents (16)** — DevOps, Knowledge-Manager, Infrastruktur, Frontend-Dev, Backend-Dev, QA-Engineer, UX-Researcher, UX-UI, Visual-Designer, Content-Copy, Content-Stratege, Daten-Engineer, Datenanalyst, Infografik-Designer, Buchhaltung, Freelance-Business
-- **Hooks** — Phase-Gate, Tech-Debt-Gate, Pre-Abnahme-Gate, Pre-Push-Vercel-Verify, Auto-Notification, etc.
+Nach dem Token-Leak-Postmortem (Sprint 261, 2026-05-01) wurde die Cloud-Architektur grundlegend umgebaut:
 
-## Installation
+**Vorher (was dieser Repo bediente):**
+- Cloud-Sessions installierten Plugin via `github:escholly-ship-it/scholly-toolkit` Marketplace
+- Brauchte Push-Token + Sync-Mechanismus zwischen `~/Cowork/scholly-toolkit/` und diesem Repo
+- Manuelle Pflege des Plugin-Marketplace-Repos
 
-### Lokal (Verzeichnis-Marketplace)
+**Nachher (aktuelle Architektur, ab Sprint 259):**
+- Cloud-Bootstrap-Setup-Script clont `escholly-ship-it/cowork` direkt via `CLOUDE_GITHUB_TOKEN` (Fine-grained PAT, **read-only**, 90 Tage Expiration)
+- Cloud-Session sieht damit DIREKT `/workspace/cowork/scholly-toolkit/skills/` — alle Skills automatisch da
+- Kein separates Marketplace-Repo noetig
+- Schreib-Token bewusst nicht eingerichtet (Sicherheits-Haertung)
 
-```bash
-# Plugin-Marketplace anlegen
-claude plugin add-marketplace ~/Cowork/scholly-toolkit
-claude plugin install scholly-toolkit
-```
+## Wo ist die echte Source?
 
-### Cloud (GitHub-Marketplace, Sprint 254 CLOUD-P4)
+**Source-of-Truth:** `~/Cowork/scholly-toolkit/skills/` (lokal) — gespiegelt nach `https://github.com/escholly-ship-it/cowork` Subtree `scholly-toolkit/`.
 
-```bash
-# Cloud-Sessions oder lokale Sessions
-claude plugin add-marketplace github:escholly-ship-it/scholly-toolkit
-claude plugin install scholly-toolkit
-```
+**Cloud-Pfad:** Bootstrap-Setup-Script (Memory: `sprint-259-cloud-bootstrap-prompt.md`) clont cowork → Skills sind nach `/workspace/cowork/scholly-toolkit/skills/` verfuegbar.
 
-## Workflow-Modell — Sprint-Zeremonien
+## Stand dieses Repos
 
-7 Phasen, strikt sequentiell:
+Letzter Sync war Sprint 265 (2026-05-06) als die Architektur noch nicht final korrigiert war — entspricht damit teilweise dem Source-of-Truth-Stand vom 2026-05-06 (16 Skills + sprint-planning + plugin.json v1.1.0). Es gibt **keinen Auto-Sync mehr** — bei Bedarf manueller Push.
 
-A) `/sprint-start` → B) Ideation → C) Planning (+`/design-gate`) → D) Execution → E) `/sprint-review` (+`/deploy-verify`) → F+G) `/sprint-retro`
+## Cross-Refs
 
-Details siehe SKILL.md pro Skill + Agent-Persona pro Experte.
-
-## Cross-Ref
-
-- **Sprint-Prozess-Doku:** `~/.claude/CLAUDE.md` (lokal) bzw. `escholly-ship-it/claude-config/CLAUDE.md`
-- **Memory-Architektur:** `escholly-ship-it/claude-config` Repo
-- **Cloud-Migration:** Sprint 254 (CC-CLOUD-MIGRATION + CLOUD-MASTER)
-
-## Status
-
-Sprint 254 (2026-04-30): Marketplace published von `~/Cowork/scholly-toolkit/` als eigenes GitHub-Repo. Ermoeglicht Cloud-Sessions auf claude.ai/code, das Toolkit als Plugin-Marketplace einzubinden ohne Filesystem-Source-Pfad.
+- **Aktuelle Cloud-Architektur:** `escholly-ship-it/claude-config` Memory `sprint-259-cloud-bootstrap-prompt.md`
+- **Token-Leak-Postmortem:** `escholly-ship-it/claude-config` Memory `incident-2026-05-01-token-leak-postmortem.md`
+- **Sprint 265 Liefer-Doku:** `escholly-ship-it/claude-config` Memory `sprint-265-skills-cloud-distribution.md`
 
 ## Maintainer
 
 Torsten Schollmayer · escholly@gmail.com · escholly-ship-it Org
-
-Lokales Repo (Source): siehe `~/Cowork/scholly-toolkit/` im cowork-Repo. GitHub-Repo (dieses) ist eine published-Spiegelung fuer Cloud-Marketplace-Use.
