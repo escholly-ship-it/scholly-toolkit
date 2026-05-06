@@ -177,8 +177,19 @@ python3 ~/Cowork/scripts/capacity-analysis.py --auto-sprint-end
 **Ohne diesen Schritt** veraltet der Pack-Algo-Richtwert — Sprints werden gegen einen stalen Durchschnitt geplant.
 
 
-Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases` die Zeile `F=` auf `F=done` zu aendern.
+Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases-<id>` die Zeile `F=` auf `F=done` zu aendern.
 **KEIN Bash/sed** — das loest eine Berechtigungsabfrage aus weil `~/.claude/` geschuetzt ist.
+
+**Cloud-Mirror (CC-264-SYNC-PHASE-STATE-API, Sprint 264, PFLICHT):**
+```bash
+TOKEN=$(cat ~/.roadmap-api-token)
+SESSION=$(cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]')
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"'$SESSION'","phase_f":"done"}' \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state >/dev/null
+```
 
 ## G.2: Roadmap-Sync + Counter (Regel 87, 90 — API ist Single Source of Truth)
 
@@ -455,8 +466,107 @@ mkdir -p ~/Cowork/.phase-markers && echo done > ~/Cowork/.phase-markers/g-backup
 ```
 (CC-121 Sprint 157: separater `g-uebergabe`-Marker entfernt — redundant zu `g-backup`. `/sprint-start` der naechsten Session liest Counter/Backlog/Roadmap selbst; keine Prompt-Ausgabe hier noetig.)
 
-## G.8: Board-Verifikation + G=done setzen (ALLERLETZTER SCHRITT)
-**Board-Integritaet pruefen UND G=done in einem Schritt.**
+## G.7b: Cloud-Branch-Auto-Merge (CC-264-SYNC-CLOUD-BRANCH-MERGE, Sprint 264)
+
+**Ziel:** Cloud-Sessions hinterlassen offene `claude/...`-Branches in 3 Repos (claude-config, Cowork, roadmap). Sprint-Retro mergt diese autonom — Mac muss nichts manuell drueben tun.
+
+**Detection:** `gh pr list --search "head:claude" --state open` pro Repo.
+
+**Lokal-Mode (Default — Mac als Operator):**
+```bash
+SPRINT_GLOBAL=$(cat ~/Cowork/.sprint-global)
+MERGE_LOG=~/Cowork/logs/cloud-branch-merge-sprint-${SPRINT_GLOBAL}.log
+mkdir -p ~/Cowork/logs
+echo "[$(date -Iseconds)] Cloud-Branch-Merge Sprint $SPRINT_GLOBAL — Start" > "$MERGE_LOG"
+
+merge_repo() {
+  local repo_path="$1"
+  local repo_label="$2"
+  cd "$repo_path" || return 1
+  # Open PRs from claude/ branches
+  local prs=$(gh pr list --state open --search "head:claude" --json number,title,headRefName,mergeable,mergeStateStatus --limit 20 2>/dev/null)
+  echo "$prs" | python3 -c "
+import json, sys
+prs = json.load(sys.stdin)
+for pr in prs:
+    print(f\"{pr['number']}|{pr['mergeable']}|{pr['mergeStateStatus']}|{pr['headRefName']}|{pr['title'][:60]}\")
+" | while IFS='|' read -r num mergeable state branch title; do
+    echo "[$repo_label] PR #$num branch=$branch mergeable=$mergeable state=$state title=$title" >> "$MERGE_LOG"
+    if [[ "$mergeable" == "MERGEABLE" && "$state" == "CLEAN" ]]; then
+      gh pr merge "$num" --squash --delete-branch --auto 2>&1 | tee -a "$MERGE_LOG"
+      echo "[$repo_label] ✅ PR #$num gemergt" >> "$MERGE_LOG"
+    else
+      echo "[$repo_label] ⚠️ PR #$num skip (mergeable=$mergeable, state=$state) — manueller Eingriff" >> "$MERGE_LOG"
+    fi
+  done
+}
+
+merge_repo ~/.claude "claude-config"
+merge_repo ~/Cowork "cowork"
+merge_repo ~/projects/roadmap "roadmap"
+
+echo "[$(date -Iseconds)] Cloud-Branch-Merge Sprint $SPRINT_GLOBAL — Fertig" >> "$MERGE_LOG"
+tail -20 "$MERGE_LOG"
+```
+
+**Failure-Modi:**
+- **mergeable=CONFLICTING** → Skip + im Chat melden, Scholly muss manuell mergen.
+- **gh-CLI nicht eingeloggt** → `gh auth status` failt → Skip mit 1-Satz-Hinweis, kein Hard-Fail.
+- **Repo-Pfad nicht vorhanden** → Skip.
+
+**Cloud-Mode:** Cloud-Session hat keinen lokalen `~/.claude` etc. Workaround:
+```
+POST /api/hook-relay
+{"type": "branch-merge", "repos": ["escholly-ship-it/claude-config","escholly-ship-it/cowork","escholly-ship-it/roadmap"], "search": "head:claude"}
+```
+(Endpoint wird in CC-264-SYNC-CLOUD-BRANCH-MERGE-CLOUD nachgereicht, falls in echter Cloud-Session genutzt.)
+
+**Marker:**
+```bash
+echo done > ~/Cowork/.phase-markers/g-cloud-branches
+```
+
+## G.8: Board-Verifikation + Mac-Verify-Gate + G=done setzen (ALLERLETZTER SCHRITT)
+**Board-Integritaet pruefen, Mac-Verify-Sign-Off pruefen UND G=done in einem Schritt.**
+
+### G.8a: Mac-Verify-Gate (CC-264-VERIFY-LOCATION-FLAG, Sprint 264) — STOPP-Pflicht
+
+Items mit `verify_location=mac` oder `=hybrid` brauchen Schollys Mac-Verify-OK aus Phase E. Kein G=done bevor der Sentinel und der OK-Marker matchen — sonst geht der Mac aus, bevor LaunchAgent-/Sync-Lauf signed-off ist.
+
+```bash
+SPRINT_TAG=$(cat ~/Cowork/.current-sprint-tag 2>/dev/null | tr -d '[:space:]')
+GS=$(cat ~/Cowork/.sprint-global 2>/dev/null | tr -d '[:space:]')
+REQUIRED_FILE="$HOME/Cowork/.mac-verify/sprint-${GS}-required.json"
+OK_MARKER="$HOME/Cowork/.phase-markers/$SPRINT_TAG/mac-verify-ok"
+
+if [ ! -f "$REQUIRED_FILE" ]; then
+  echo "ℹ️  Kein Mac-Verify-Sentinel — entweder reiner Cloud-Sprint (alle Items verify_location=cloud) oder Phase E hat das e-mac-verify-block-Step uebersprungen."
+  echo "    Wenn dieser Sprint Mac/Hybrid-Items enthielt: Phase E nachholen (sprint-review Schritt 5b). Sonst: weiter."
+elif [ "$(cat "$REQUIRED_FILE")" = "[]" ]; then
+  echo "✅ Mac-Verify-Gate: Sentinel leer (alle Items verify_location=cloud) — kein Sign-Off noetig."
+elif [ ! -f "$OK_MARKER" ]; then
+  echo "🛑 STOPP — Mac-Verify-OK fehlt:"
+  echo "   Required: $(cat "$REQUIRED_FILE")"
+  echo "   Marker:   $OK_MARKER (nicht gesetzt)"
+  echo ""
+  echo "Scholly muss am Mac die in Phase E gepushten Kommandos ausfuehren und"
+  echo "antworten 'mac-verify OK' (Claude setzt dann den Marker via:"
+  echo "  echo 'OK <ts>' > '$OK_MARKER'"
+  echo "). KEIN G=done vorher. KEIN Mac-aus vorher."
+  exit 2
+else
+  echo "✅ Mac-Verify-Gate: Sign-Off vorhanden ($(cat "$OK_MARKER"))"
+fi
+```
+
+**Cloud-Mode:** `GET /api/phase-state?session=<UUID>` liest `markers["mac-verify-ok"]`. Sentinel-Required-Liste lebt im Sprint-Cache (`/api/sprint-cache`) als Feld `mac_verify_required`.
+
+**Antwort-Pattern fuer Scholly:**
+- `"mac-verify OK"` → Claude setzt `$OK_MARKER` via Write-Tool, weiter mit G.8b.
+- `"mac-verify KRITIK: <text>"` → zurueck zu Phase E Schritt 1 (Bug-Fix), neuer Mac-Verify-Block am Ende.
+- Stille Pause = STOPP. Phase G nicht durchwinken — Mac koennte ausgehen.
+
+### G.8b: Board-Verifikation + G=done
 
 ```bash
 VERIFY=$(curl -s -H "Authorization: Bearer $ROADMAP_TOKEN" https://roadmap-escholly-ship-its-projects.vercel.app/api/verify)
@@ -480,9 +590,20 @@ fi
 6. Keine Items mit Zukunfts-Frist in Sprints
 
 **g-e2e-verified gesetzt** → G=done setzen:
-Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases` die Zeile `G=` auf `G=done` zu aendern.
+Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases-<id>` die Zeile `G=` auf `G=done` zu aendern.
 **KEIN Bash/sed** — Berechtigungsschutz von `~/.claude/`.
 **Ohne diesen Schritt blockiert das Phase-Gate die Session-Beendigung.**
+
+**Cloud-Mirror (CC-264-SYNC-PHASE-STATE-API, Sprint 264, PFLICHT):**
+```bash
+TOKEN=$(cat ~/.roadmap-api-token)
+SESSION=$(cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]')
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"'$SESSION'","phase_g":"done"}' \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state >/dev/null
+```
 
 **Findings** → Beheben via PATCH `/api/items`, dann erneut pruefen.
 

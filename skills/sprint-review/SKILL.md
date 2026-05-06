@@ -287,18 +287,93 @@ Der Block MUSS im Abnahme-Posting unter dem Deliverables-Block erscheinen — Sc
 
 Initiativen-Definition liegt im API-Endpoint + Skript (`INITIATIVES`-Liste in `cross-project-overview.py`). Bei neuer Master-Initiative: Liste in beiden Quellen erweitern, dann verfuegbar.
 
-**Abnahme-Block Format (CC-213 gekuerzt, Sprint 192):**
+**Abnahme-Block Format (CC-213 gekuerzt, Sprint 192, CC-264 ergaenzt Sprint 264):**
 ```
 ## Sprint [Nr] — Abnahme
 
-| # | Deliverable | Evidenz |
-|---|-------------|---------|
-| D1 | [Titel] | [URL/Commit/Output] |
+| # | Deliverable | Evidenz | Verify-Loc |
+|---|-------------|---------|-----------|
+| D1 | [Titel] | [URL/Commit/Output] | cloud/mac/hybrid |
 
 **Abweichungen:** [falls keine: "keine"]
 
+**Mac-Verify-Block (PFLICHT bei Items mit verify_location=mac/hybrid):**
+[Push-Block — siehe naechste Sektion. Bei reinem Cloud-Sprint (alle Items verify_location=cloud) entfaellt der Block — Hinweis "kein Mac-Verify noetig — alle Items cloud-verifiziert".]
+
 **"OK" zur Abnahme, sonst konkrete Kritik.**
 ```
+
+### Schritt 5b: Mac-Verify-Block generieren (CC-264-VERIFY-LOCATION-FLAG, Sprint 264) — PFLICHT bei verify_location=mac/hybrid
+
+**Zweck:** Bei Hybrid-Sprints (Variante A) sieht die Cloud-Session **nicht**, ob der Mac-Anteil durchgelaufen ist. Scholly muss am Mac konkrete Kommandos ausfuehren und den OK-Status zurueckmelden, BEVOR Phase G schliesst (kein Mac-aus vor Sign-Off).
+
+**Daten holen:**
+```bash
+TOKEN=$(cat ~/.roadmap-api-token 2>/dev/null || echo "$ROADMAP_TOKEN")
+GS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/verify | python3 -c "import json,sys; print(json.load(sys.stdin)['globalSprint'])")
+ITEMS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/items)
+python3 - <<EOF
+import json
+items = json.loads('''$ITEMS''')
+gs = $GS
+sprint_items = [i for i in items if i.get('sprint_nummer') == gs]
+mac = [i for i in sprint_items if i.get('verify_location') in ('mac','hybrid')]
+if not mac:
+    print('SKIP_MAC_VERIFY: alle Items verify_location=cloud — kein Mac-Verify-Block noetig.')
+else:
+    print(f'MAC_VERIFY_BLOCK ({len(mac)} Items):')
+    for i in mac:
+        print(f"  - {i['backlog_id']:25} ({i['verify_location']:6}): {i['title'][:60]}")
+EOF
+```
+
+**Block-Format (Push an Scholly + im Chat — IDENTISCH formuliert, Push als 1-Zeilen-Verkuerzung):**
+
+```
+### 🖥️ Mac-Verify (Sprint <N> — verify_location=mac/hybrid)
+
+Bevor Phase G schliessen darf, fuehre am Mac aus + antworte mit "mac-verify OK" oder "mac-verify KRITIK: <text>":
+
+| # | Backlog-ID | Verify-Loc | Konkrete Mac-Kommandos |
+|---|-----------|-----------|------------------------|
+| M1 | <CC-XXX>  | mac       | <z.B. `launchctl kickstart gui/$(id -u)/com.cowork.<agent>` + `tail -n 50 ~/Cowork/logs/<agent>.log`> |
+| M2 | <CC-YYY>  | hybrid    | <z.B. `cd ~/.claude/skills && ./sync-skill-plugin-cache/run.sh && rsync -av ... && ls -la ...`> |
+
+**Kein Mac-aus** bevor du "mac-verify OK" geschickt hast — Phase G blockiert sonst auf `mac-verify-ok`-Marker (siehe `sprint-retro` G.8).
+```
+
+**Kommando-Heuristik pro `verify_location`-Wert:**
+
+- `verify_location=mac` (typisch LaunchAgent-Items): `launchctl print gui/$(id -u)/<label>` (Status), `launchctl kickstart gui/$(id -u)/<label>` (Trigger-Run), `tail -n 50 ~/Cowork/logs/<runner>.log` (Output), Counter-/State-File-Read.
+- `verify_location=hybrid` (typisch Sync-Items mit GHA + Mac-Mirror): GHA-Run-URL angeben + Mac-Side-Kommando (rsync-Lauf, Skill-Re-Upload, Counter-Inkrement-Lokal).
+
+Pro Item Source-Of-Truth: das Item-`notizen`-Feld sollte beim Anlegen in Phase A die Mac-Kommandos enthalten (Pattern: `MAC-VERIFY: <cmd1>; <cmd2>`). Skill liest sie hier raus — Fallback "Kommandos aus Item-Notizen extrahieren ODER Scholly fragt im KRITIK-Pfad nach".
+
+**Push (Sprint 261 PushNotification, ergaenzt Sprint 264):** Bei NICHT-leerem Mac-Verify-Block ZUSAETZLICH zur Abnahme-Push:
+```
+PushNotification(status: 'proactive', message: 'Sprint <N> — Mac-Verify offen: <N> Items (verify_location=mac/hybrid). Kommandos im Chat. Mac NICHT ausschalten — antworte "mac-verify OK" oder "KRITIK: ...".')
+```
+
+Bei reinem Cloud-Sprint (alle Items `verify_location=cloud`) entfaellt der Block ersatzlos — Phase G laeuft ohne `mac-verify-ok`-Marker durch.
+
+**Marker:**
+```bash
+echo done > ~/Cowork/.phase-markers/e-mac-verify-block
+# Sentinel-Datei fuer Phase G — listet alle Items, die mac-verify-ok brauchen:
+mkdir -p ~/Cowork/.mac-verify
+python3 -c "
+import json
+items = json.loads('''$ITEMS''')
+gs = $GS
+mac = [i['backlog_id'] for i in items if i.get('sprint_nummer')==gs and i.get('verify_location') in ('mac','hybrid')]
+open(f'$HOME/Cowork/.mac-verify/sprint-{gs}-required.json','w').write(json.dumps(mac))
+print(f'Mac-Verify required for: {mac}')
+"
+```
+
+Der Sentinel `.mac-verify/sprint-<N>-required.json` wird in Phase G G.8 gegen `mac-verify-ok`-Eintraege gegengeprueft.
 
 **Mobile-Push (Sprint 261 PushNotification-Migration):** SOFORT nach Block:
 ```
@@ -371,6 +446,20 @@ Der Hook belegt dass die Migration wirklich durch ist — ohne den Lauf bleibt R
 
 **Marker:** `echo done > ~/Cowork/.phase-markers/e-doku-backup`
 
-## Phase-State E=done setzen + Weiter zu Retro
-Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases` die Zeile `E=` auf `E=done` zu aendern.
+## Phase-State E=done setzen + Cloud-Mirror + Weiter zu Retro
+
+**1) Lokales State-File:** Nutze das **Edit-Tool** um in `~/Cowork/.sprint-phases-<id>` die Zeile `E=` auf `E=done` zu aendern.
+
+**2) Cloud-Mirror (CC-264-SYNC-PHASE-STATE-API, Sprint 264, PFLICHT):**
+```bash
+TOKEN=$(cat ~/.roadmap-api-token)
+SESSION=$(cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]')
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"'$SESSION'","phase_e":"done"}' \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state >/dev/null
+```
+Bei API-Fail (5xx, Network): 1-Satz-Hinweis loggen, NICHT blockieren.
+
 → Nutze `/sprint-retro` fuer Phase F.

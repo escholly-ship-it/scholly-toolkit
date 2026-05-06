@@ -291,6 +291,52 @@ else:
 
 **STOPP-Pflicht:** Bei Treffern PATCH `effort=<XS/S/M/L/XL>` ODER `notizen` mit Praefix `[KONZEPT-DOKU]` versehen. Konzept-Doku-Items zaehlen 0P im Pack-Algo. KEIN Item ohne Klassifikation in den Scope-Block (4e) durchwinken.
 
+**4a5) Verify-Location-Vollstaendigkeit (CC-264-VERIFY-LOCATION-FLAG, Sprint 264) — STOPP-Pflicht:**
+
+Hybrid-Sprints (Cloud + Mac parallel) brauchen pro Sprint-Item eine eindeutige Verifikations-Lokation, sonst ist in Phase E nicht klar wer was abnimmt — und in Phase G kann der Mac vor dem Sign-Off ausgehen.
+
+Jedes Sprint-Item MUSS das Feld `verify_location` mit genau einem Wert haben:
+
+| Wert | Bedeutung | Typische Item-Klasse |
+|------|-----------|----------------------|
+| `cloud` | Verifikation laeuft komplett in der Cloud-Session (API-Calls, Skill-Self-Tests, Web-Preview, GHA). Kein Mac-Login noetig. | API/Skill/Konzept-Items, Cloud-Workflow, Roadmap-API-Tests |
+| `mac` | Verifikation braucht physischen Mac-Zugriff (LaunchAgent, lokale Notify-Daemons, macOS-Spezifika, Keychain). Cloud sieht nichts davon. | LaunchAgent-Setup, Menubar/Statusbar-UI, Mac-only Hooks |
+| `hybrid` | Teil der Verifikation laeuft Cloud (z.B. GHA-Run remote), Teil am Mac (z.B. rsync-Lauf, Personal-Skill-Re-Upload, Mac-Smoke-Test). | Bidirectional-Sync, GHA+Mac-Mirror, Distribution-Items |
+
+**Validation-Block (Cloud-tauglich, ersetzt 4a4-Pattern):**
+```bash
+python3 - <<'EOF'
+import json, os
+sprint_tag = os.popen("cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]'").read().strip()
+cache = json.load(open(os.path.expanduser(f"~/Cowork/.sprint-start-cache-{sprint_tag}.json")))
+gs = cache['verify']['globalSprint']
+sprint_items = [i for i in cache['items'] if i.get('sprint_nummer') == gs]
+ALLOWED = {'cloud', 'mac', 'hybrid'}
+missing = [i for i in sprint_items if i.get('verify_location') not in ALLOWED]
+if missing:
+    print(f'⚠️  verify_location FEHLT/UNGUELTIG bei {len(missing)} Items:')
+    for i in missing:
+        print(f'  {i["backlog_id"]:25} | {i.get("verify_location") or "(leer)":7} | {i["title"][:50]}')
+    print('→ Pflicht: PATCH /api/items mit verify_location=cloud|mac|hybrid pro Item.')
+    print('   Heuristik: LaunchAgent/Mac-Daemon → mac; API/Skill/Cloud-Workflow → cloud; rsync/GHA+Mac → hybrid.')
+    raise SystemExit(2)
+print(f'✅ verify_location: alle {len(sprint_items)} Sprint-Items klassifiziert.')
+EOF
+```
+
+**Cloud-Mode (Sprint 257):** Statt FS-Cache via `GET /api/sprint-cache?session=<UUID>` lesen + gleiche Logik im JS/Python anwenden.
+
+**STOPP-Pflicht:** Exit 2 → KEIN Phase-A-Abschluss bevor jedes Sprint-Item ein gueltiges `verify_location` hat. Klassifikation erfolgt via `PATCH /api/items/<id> {"verify_location":"cloud|mac|hybrid"}`. Nach PATCH: Cache neu laden (Schritt 3b-Block).
+
+**Hybrid-Sprint-Heuristik (Variante A, Sprint 264):**
+- Item testbar **ohne** Mac-Login (curl, Skill-Self-Test, Web-Preview, GHA-Action) → `cloud`
+- Item braucht zwingend Mac (LaunchAgent reload, `launchctl bootstrap`, Keychain, lokales Filesystem in `~/Library/`, Menubar-Render, macOS-Notification) → `mac`
+- Item hat eine Cloud-Haelfte (GHA/API) UND eine Mac-Haelfte (rsync, Re-Upload, Sync-zurueck-an-Mac) → `hybrid`
+
+Phase E generiert daraus den Mac-Verify-Block (siehe `sprint-review` Schritt 5b). Phase G blockiert den Sprint-Abschluss bis `mac-verify-ok` fuer alle `mac`/`hybrid`-Items vorliegt (siehe `sprint-retro` G.8).
+
+**Marker:** `echo done > $MARKERS_DIR/a-verify-location` (nach Cache-Re-Load + grünem Validation-Lauf).
+
 **4b) Tech-Debt-Check (Regel 4 — STOPP-Gate, CC-27):**
 1. Projekt-Backlog nach `[TECH-DEBT]` / `[SCHULDEN]` Tag scannen
 2. Projekt-Verzeichnis scannen (wenn Code-Projekt): `grep -r "TODO\|FIXME\|HACK\|XXX" ~/projects/$PROJECT_DIR/src`
@@ -417,12 +463,12 @@ echo done > $MARKERS_DIR/a-plugin-cache
 ```
 
 
-**4e) Scope + Deliverables + Ziel anzeigen (Regel 54+45, CC-69, CC-191):** Alles in EINEM Block:
+**4e) Scope + Deliverables + Ziel anzeigen (Regel 54+45, CC-69, CC-191, CC-264):** Alles in EINEM Block:
 ```
 ### Sprint [Nr] — Scope + Deliverables
-| # | Item | Backlog-ID | Effort | Prod-Touch | Was es fuer dich bedeutet |
-|---|------|------------|--------|-----------|--------------------------|
-| 1 | ... | ... | ... | ja/nein | [Kundensprache!] |
+| # | Item | Backlog-ID | Effort | Prod-Touch | Verify-Loc | Was es fuer dich bedeutet |
+|---|------|------------|--------|-----------|-----------|--------------------------|
+| 1 | ... | ... | ... | ja/nein | cloud/mac/hybrid | [Kundensprache!] |
 
 ### Deliverables
 | # | Deliverable | Beschreibung |
@@ -442,6 +488,8 @@ echo done > $MARKERS_DIR/a-plugin-cache
 Prod-Touch = **nein** bei: Skill-/Hook-/Memory-/Prozess-Arbeit in `~/.claude/`, Experten-Persona-Updates, Backlog-Verdichtung, rein forensischen Items (Log-Analyse ohne Write), Runner-Scripts unter `~/Cowork/` solange sie lokal laufen ohne neuen `launchctl bootstrap`.
 
 **Grauzone:** Roadmap-Tool (`~/projects/roadmap/`) ist Prod-Touch=ja weil Vercel-Deploy mit Push triggert. Case-Study Sprint 194: CC-212 wurde als `nein` gelabelt, war aber Roadmap-Code → nachtraegliche Scope-Block-Korrektur in Phase E. CC-236 eindeutig regelt: `~/projects/roadmap/` berührt → Prod-Touch=ja.
+
+**Verify-Loc-Spalte (CC-264):** Wert ist `verify_location` aus dem Item (cloud/mac/hybrid). Sprints gemischter Verify-Loc sind ausdruecklich erlaubt (Hybrid-Sprint Variante A) — der Mac-Verify-Block in Phase E zieht alle `mac`/`hybrid`-Items zusammen, Phase G blockt bis Sign-off.
 
 **Marker:** `echo done > $MARKERS_DIR/a-deliverables`
 
@@ -771,8 +819,33 @@ Nach jedem `<phase>=done` darf der naechste Turn **NICHT** mit reinem Text enden
 1. Plan/Konzept/Output als Tool-Call dokumentieren (TodoWrite/Write/Edit)
 2. Marker-Bash `echo done > $MARKERS_DIR/<phase>-...`
 3. State-File-Edit `Edit($PHASES_FILE, ...)` auf `<aktuelle_phase>=done`
-4. Self-Validation: `bash ~/.claude/skills/sprint-start/validate-phase.sh <PHASE>` — gibt exit 1 wenn Pflicht-Schritte fehlen, Claude muss nachbessern
-5. Direkt anschliessend nächster Phase-Tool-Call ODER Skill-Aufruf
+4. **PATCH /api/phase-state — Cloud-Mirror (CC-264-SYNC-PHASE-STATE-API, Sprint 264, PFLICHT):**
+   ```bash
+   TOKEN=$(cat ~/.roadmap-api-token)
+   SESSION=$(cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]')
+   curl -sS -X PATCH \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"session_id":"'$SESSION'","phase_<x>":"done"}' \
+     https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state >/dev/null
+   ```
+   `<x>` ∈ {a,b,c,d,e,f,g}. **Bei `D=in_progress` analog mit `"phase_d":"in_progress"`.** Diese PATCH spiegelt den Mac-State nach Supabase, sodass Cloud-Sessions den Mac-State sehen koennen — und umgekehrt. Bei API-Fail (5xx, Network): 1-Satz-Hinweis loggen, NICHT blockieren (Mac-FS bleibt SoT).
+5. Self-Validation: `bash ~/.claude/skills/sprint-start/validate-phase.sh <PHASE>` — gibt exit 1 wenn Pflicht-Schritte fehlen, Claude muss nachbessern
+6. Direkt anschliessend nächster Phase-Tool-Call ODER Skill-Aufruf
+
+**Schritt 0 (POST init) zusaetzlich PFLICHT (CC-264-SYNC-PHASE-STATE-API):** Vor allen anderen Phase-A-Schritten:
+```bash
+TOKEN=$(cat ~/.roadmap-api-token)
+SESSION=$(cat ~/Cowork/.current-sprint-tag | tr -d '[:space:]')
+GS=$(cat ~/Cowork/.sprint-global)
+curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" \
+  "https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state?session=$SESSION" >/dev/null
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"session_id":"'$SESSION'","sprint":'$GS',"project":"tbd"}' \
+  https://roadmap-escholly-ship-its-projects.vercel.app/api/phase-state >/dev/null
+```
+Damit ist die Cloud-Tabelle `phase_state` fuer diese Session frisch.
 
 **Telegram-Pushes — NUR an 3 Stellen pro Sprint** (Scholly-Klarstellung Sprint 246):
 
@@ -806,17 +879,19 @@ ZUSAETZLICH zu den 3 geplanten Pushes T1/T2/T3 gibt es **ad-hoc Wartepunkte**, d
 
 **KONKRETE PHASEN-TRANSITIONS (Cheatsheet):**
 
+Jede Zeile zeigt den vollen Tool-Call-Block am Ende der Phase. **PATCH /api/phase-state (CC-264) ist Pflicht in jeder Zeile** — Cloud-Mirror.
+
 | Von Phase | Pflicht-Tool-Calls am Ende | Naechster Schritt |
 |-----------|----------------------------|-------------------|
-| A done | a-* marker + State-File A=done + `PushNotification` Sprint-Goal + validate-phase A | Phase B Plan via TodoWrite |
-| B done | b-ideation marker + State-File B=done + validate-phase B (kein Push) | Phase C Write Konzept |
-| C done | c-planning marker + State-File C=done + validate-phase C (kein Push) | Phase D Code-Tool-Calls |
-| D done | d-execution marker + State-File D=done + validate-phase D (kein Push) | **`/sprint-review` Skill aufrufen** |
-| E done | e-* marker + `PushNotification` Kunden-Abnahme + validate-phase E | **`/sprint-retro` Skill aufrufen** |
-| F done | f-* marker + State-File F=done + validate-phase F (kein Push) | Phase G via gleichem Skill |
-| G done | g-* marker + `PushNotification` Sprint-End + validate-phase G | Sprint fertig, neue Session |
+| A done | a-* marker + State-File A=done + **PATCH phase_a=done** + `PushNotification` Sprint-Goal + validate-phase A | Phase B Plan via TodoWrite |
+| B done | b-ideation marker + State-File B=done + **PATCH phase_b=done** + validate-phase B (kein Push) | Phase C Write Konzept |
+| C done | c-planning marker + State-File C=done + **PATCH phase_c=done** + validate-phase C (kein Push) | Phase D Code-Tool-Calls |
+| D done | d-execution marker + State-File D=done + **PATCH phase_d=done** + validate-phase D (kein Push) | **`/sprint-review` Skill aufrufen** |
+| E done | e-* marker + State-File E=done + **PATCH phase_e=done** + `PushNotification` Kunden-Abnahme + validate-phase E | **`/sprint-retro` Skill aufrufen** |
+| F done | f-* marker + State-File F=done + **PATCH phase_f=done** + validate-phase F (kein Push) | Phase G via gleichem Skill |
+| G done | g-* marker + State-File G=done + **PATCH phase_g=done** + `PushNotification` Sprint-End + validate-phase G | Sprint fertig, neue Session |
 
-**MERKE:** Phase-Uebergang = mind. 4 Tool-Calls (Doku-Tool + Marker + State-Edit + Validate). Nur A/E/G zusaetzlich Telegram. Nach D MUSS `/sprint-review` aufgerufen werden, nach E `/sprint-retro`. Skill-Chain ist DETERMINISTISCH — keine Pause, keine Frage.
+**MERKE:** Phase-Uebergang = mind. **5 Tool-Calls** (Doku-Tool + Marker + State-Edit + **API-PATCH** + Validate). Nur A/E/G zusaetzlich Push. Nach D MUSS `/sprint-review` aufgerufen werden, nach E `/sprint-retro`. Skill-Chain ist DETERMINISTISCH — keine Pause, keine Frage.
 
 ### Phasen-Entscheidung
 - Phase B+C durchlaufen → Phase D. Marker am Ende: `echo done > $MARKERS_DIR/d-execution`
