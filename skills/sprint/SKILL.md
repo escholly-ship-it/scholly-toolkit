@@ -458,5 +458,3 @@ Alte Skills `/start`, `/close`, `/sprint-start`, `/sprint-review`, `/sprint-retr
 - Notify: `~/Cowork/scripts/notify.sh` (J2)
 - Pause-Resume: `phase_state.current_item_id` (J3)
 - Sync-Fix: `/api/sync` `sprint_nummer` behaelt bei done+archived (J5)
-
-<!-- E2E-Test Sprint 291 Phase D 15:30:56Z -->
