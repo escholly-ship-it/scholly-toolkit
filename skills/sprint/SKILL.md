@@ -297,33 +297,73 @@ curl -sS -X PATCH ... -d "{...output_json.solution_design:{
 
 ---
 
-## Phase D — Execution
+## Phase D — Execution (parallel via Agent View, seit Sprint 291 V2)
 
-**Pro Item-Loop:**
+**Vorbereitung — Plan-Lesen:**
+- Aus Phase-1-Artifact `solution_design`: `execution_order`, `item_dependencies`, `edge_case_conflicts`
+- Klassifiziere jedes nicht-erledigte Sprint-Item:
+  - **independent**: kein Eintrag in `item_dependencies` als `depends_on` UND keine offene Pre-Condition UND nicht in einem `edge_case_conflicts`-Cluster mit gerade laufendem Item
+  - **dependent**: hat `depends_on`-Eintrag das noch nicht `status=done` ist
+  - **serial-only**: in `edge_case_conflicts` als "strikt seriell" markiert (z.B. Supabase-Key-Migration vor RLS-Hardening)
+
+**Dispatch-Decision-Tree pro Item:**
+
+| Item-Charakter | Mechanismus | Begruendung |
+|----------------|-------------|-------------|
+| Cross-Repo / lange Run / komplexes State / Worktree-Isolation erforderlich | `mcp__ccd_session__spawn_task` (Card) | Vollstaendige Worktree-Isolation, fresher Context-Pool |
+| Code-Task im SELBEN Repo wie Orchestrator, parallel-safe | `Agent` Tool mit `run_in_background: true` + spezifischem `subagent_type` | Kein Worktree-Conflict, schneller, kein User-Klick |
+| Doku / Memory / Decision-Doc / leichter Cleanup | seriell in this-session | Kein Dispatch-Overhead |
+
+**Per-Sweep-Loop:**
 
 ```
-For ITEM in execution_order:
-  1. Setze phase_state.current_item_id = ITEM.id (PATCH /api/phase-state)
-  2. PATCH /api/items {id: ITEM.id, status: 'in_progress'}
-  3. Arbeite an Item bis AC erfuellt:
-     - Lies AC + notizen
-     - Editiere/erstelle Files
-     - Schreibe Tests (Pattern: src/lib/__tests__/*.test.ts oder Bash-Test)
-     - Run Tests bis gruen
-  4. PATCH /api/items {id: ITEM.id, status: 'done', notizen: '<delivery-bilanz>'}
-
-  Pause-Bedingung (Token-Fenster knapp):
-    - phase_state.current_item_id BLEIBT gesetzt
-    - Item.status BLEIBT 'in_progress'
-    - notizen += '\n---SUB-STATE---\n<wo stehe ich genau>'
-    - KEIN notify() — silent stop
-    - Naechste Session: Schritt 0 Resume-Check greift, springt zurueck
+1. Lesen: GET /api/items?sprint=N — aktuellen Status aller Items
+2. Klassifizieren: jedes !done-Item nach Decision-Tree oben einsortieren
+3. Dispatchen:
+   - Alle independent + dispatchable Items via spawn_task ODER Agent run_in_background starten
+   - phase_state.current_item_id auf orchestriertes Item setzen (Resume-Support)
+   - Item-Status PATCH 'in_progress'
+4. Im This-Session-Worktree: serial-only Lane + seriell-in-session Items abarbeiten
+5. Status-Polling: alle 5-10 Tool-Calls /api/items?sprint=N pruefen
+   - Sub-Session markiert Item done -> Pre-Condition fuer dependent Items entriegelt
+   - dependent Items wechseln zu dispatchable + werden im naechsten Sweep gestartet
+6. Wenn alle Items done -> Phase E
 ```
+
+**Heuristik (aus Sprint 291 Pilot):**
+- 3-4 parallele spawn_tasks sind sicher und bewaehrt
+- Mehr als 4 parallel: Worktree-Limits + Token-Budget pro Sub-Session beachten
+- Sub-Sessions sind FIRE-AND-FORGET: Orchestrator polls API, Sub-Sessions schreiben Status direkt zurueck (keine return-channel-Abhaengigkeit)
+- Bei spawn_task: User muss Card klicken. Bei Agent run_in_background: vollautomatisch.
+
+**Sub-Session-Briefing-Template** (Pflicht in spawn_task `prompt`):
+
+```
+Sprint $N Lane-X Item $BACKLOG_ID ($EFFORT). UUID=$UUID.
+Sprint-API: https://roadmap-escholly-ship-its-projects.vercel.app/api (Bearer ~/.roadmap-api-token).
+
+AC: [Liste aus DB]
+Files: [Liste aus Phase-1-Artifact per_item_plan]
+Assumptions verified: [Liste aus per_item_plan]
+Risks: [Liste]
+
+Status nach Abschluss: PATCH /api/items {id: "$UUID", status: "done", notizen: "<Bilanz>"}.
+Parallel zu: [andere lane-IDs]. Worktree-Isolation aktiv.
+```
+
+**Pause-Bedingung (Token-Fenster knapp):**
+- `phase_state.current_item_id` BLEIBT gesetzt
+- Item.status BLEIBT 'in_progress'
+- notizen += '\n---SUB-STATE---\n<wo stehe ich genau>'
+- KEIN notify() — silent stop
+- Naechste Session: Schritt 0 Resume-Check greift, springt zurueck
 
 **Anti-Pattern verboten:**
 - ❌ `status='done'` ohne erfuellte AC
 - ❌ `archived=true` in Phase D (Archive ist Phase G's Job, sonst verschwinden Items aus dem Review)
 - ❌ Stop und auf Scholly warten ("soll ich weiter") — Phase D ist autonom
+- ❌ Alle Items seriell durchgehen, wenn `solution_design.execution_order` parallele Lanes ausweist (Sprint 291 V2 Lehre — Pilot bewies 4 parallel sicher)
+- ❌ Mehr als 4 spawn_tasks gleichzeitig dispatchen ohne Worktree-Token-Budget-Pruefung
 
 ---
 
