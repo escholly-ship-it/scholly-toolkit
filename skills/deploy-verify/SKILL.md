@@ -140,3 +140,60 @@ git diff main..HEAD -- 'src/' | grep -E "^\+.*setInterval|^\+.*refreshInterval"
 **Cross-Tier-Trennung:** Kundenprojekte mit Polling MUESSEN in eigenes Vercel-Konto/Pro-Plan, nicht in Hobby-Mischpott (siehe Lehre Koerperschule KS-17).
 
 **Faktum:** Vercel Hobby = 4h Active CPU/Monat fuer das gesamte Team. Bei 100% werden ALLE Projekte pausiert.
+
+---
+
+## 🔍 4c-Action-Verify-Matrix (Sprint 270 Block B — Anti-Annahme-Pattern)
+
+**PFLICHT bei JEDER Scholly-Action im Deploy-Workflow.** Wenn der Skill Scholly um eine manuelle Aktion bittet, darf er NICHT annehmen dass die Aktion fehlerlos ausgefuehrt wurde. Maschinelle Verifikation pflicht.
+
+### Action-Verify-Matrix (deploy-relevante Actions)
+
+| Scholly-Action im Deploy | Maschinelle Verifikation | Loop-Verhalten |
+|--------------------------|--------------------------|----------------|
+| **Vercel-Env-Var setzen** | `vercel env ls --scope=<team>` ODER curl gegen Endpoint der Var nutzt → Response 200 mit erwartetem Body | Loop bis 200, max 5 Versuche je 10s |
+| **Vercel Team-Protection-Bypass** | curl mit `?_vercel_share=<token>` → 200 vs 401 | Bei 401: Bypass-Token von Scholly anfordern |
+| **Vercel Custom-Domain DNS** | `dig +short <domain>` → Vercel-IP/CNAME erscheint | Loop bis DNS-Propagation, max 60s |
+| **GitHub-Secret/Setting** | `gh secret list --repo <org/repo>` ODER `gh api repos/<org>/<repo>/environments/<env>` | One-shot, kein Loop |
+| **Branch-Protection-Rule** | `gh api repos/<org>/<repo>/branches/<br>/protection` → erwartete Required-Status-Checks | One-shot |
+| **Health-Endpoint live nach Deploy** | curl /api/health → status:ok | Loop bis 200 oder 60s Timeout |
+| **App-Settings auf Mac (z.B. Vercel CLI Login)** | `vercel whoami` → User korrekt | One-shot |
+| **iPhone-Notification (Deploy-Failure-Alert)** | PushNotification proaktiv senden + Telegram-Antwort abwarten | Loop bis Antwort, max 2 Min |
+
+### Generischer Loop-Pattern
+
+```bash
+verify_action() {
+  local DESC="$1"      # z.B. "Vercel-Env-Var TELEGRAM_BOT_TOKEN"
+  local CMD="$2"       # z.B. "vercel env ls | grep TELEGRAM_BOT_TOKEN"
+  local EXPECT="$3"    # z.B. "Production"
+  local MAX_TRIES="${4:-5}"
+  local SLEEP="${5:-10}"
+
+  for i in $(seq 1 $MAX_TRIES); do
+    OUTPUT=$(eval "$CMD" 2>&1)
+    if echo "$OUTPUT" | grep -q "$EXPECT"; then
+      echo "  ✅ $DESC verifiziert (Versuch $i)"
+      return 0
+    fi
+    [ "$i" = "$MAX_TRIES" ] && break
+    echo "  ⏳ $DESC noch nicht verifiziert (Versuch $i/$MAX_TRIES), warte ${SLEEP}s..."
+    sleep "$SLEEP"
+  done
+
+  echo "  ❌ $DESC NICHT verifiziert nach $MAX_TRIES Versuchen — Scholly fragen oder Gap dokumentieren"
+  return 1
+}
+```
+
+### Anti-Annahme-Prinzip
+
+- Wenn Verify-Methode existiert → IMMER ausfuehren, nie vertrauen.
+- Wenn Verify-Methode fehlt → Scholly fragen + Gap im Deploy-Verify-Output dokumentieren.
+- KEIN Skill-Skript darf "Scholly hat es gemacht" annehmen ohne Verify-Bestaetigung.
+
+### Cross-Ref
+
+- Master-Doc: `memory/refactor-architektur-sprint-refactor-1.md` (Block B Action-Verify-Matrix kanonisch)
+- Generischer Pattern in /close Schritt 4c (Pre-Gate verifiziert Phase-3-Artifact)
+- Token-Onboarding Skill nutzt gleiche Matrix fuer Token-Aktionen

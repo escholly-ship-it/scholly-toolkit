@@ -1,6 +1,6 @@
 ---
-name: claude-design-to-nextjs
-description: Wandelt eine Claude-Design-Seite (claude.ai/design HTML-Export) in eine React/Next.js+Tailwind-Komponente um. 6-Schritt-Loop mit Playwright-Screenshots und design:design-critique-Iteration bis ACCEPT. Nutzen fuer Cookmark, Watchlist, KiHire, Koerperschule, PhysioGPT, Roadmap-Tool. Triggern wenn ein Claude-Design-Artefakt in Next.js gebraucht wird.
+name: design-to-nextjs
+description: Wandelt einen Design-HTML-Export (von claude.ai/design) in eine React/Next.js+Tailwind-Komponente um. 6-Schritt-Loop mit Playwright-Screenshots und design:design-critique-Iteration bis ACCEPT. Nutzen fuer Cookmark, Watchlist, KiHire, Koerperschule, PhysioGPT, Roadmap-Tool. Triggern wenn ein Design-Artefakt in Next.js gebraucht wird.
 ---
 
 # claude-design-to-nextjs — Workflow

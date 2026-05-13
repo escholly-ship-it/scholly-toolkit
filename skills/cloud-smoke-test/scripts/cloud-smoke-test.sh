@@ -107,12 +107,17 @@ elif [ -n "${2:-}" ] && [ "${2}" != "--local" ] && [ "${2}" != "--cloud" ]; then
 # 3. Lokal: Filesystem
 elif [ -f "$HOME/Cowork/.current-sprint-tag" ]; then
   SPRINT_TAG=$(cat "$HOME/Cowork/.current-sprint-tag" | tr -d '[:space:]')
-# 4. Cloud-Mode: aus /api/verify aktiver Session ableiten (Anchor-UUID Mac-CLI)
+# 4. Cloud-Mode: synthetischer Test-Tag (PUT + GET = Endpoint-Funktional-Test)
 elif [ "$MODE" = "cloud" ] && [ -n "${ROADMAP_API_TOKEN:-}" ]; then
-  # Hole alle phase_state Eintraege fuer aktiven Sprint, nimm den juengsten
-  SPRINT_TAG=$(curl -sS -H "Authorization: Bearer $ROADMAP_API_TOKEN" \
-    "$ROADMAP_API/api/verify" 2>/dev/null | \
-    python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('activeSession',''))" 2>/dev/null || echo "")
+  SPRINT_TAG="cloud-smoke-$(date +%s)"
+  PUT_HTTP=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
+    -H "Authorization: Bearer $ROADMAP_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"session_id\":\"$SPRINT_TAG\",\"verify\":{\"smoke\":true}}" \
+    "$ROADMAP_API/api/sprint-cache" 2>/dev/null)
+  if [ "$PUT_HTTP" != "200" ]; then
+    SPRINT_TAG=""  # PUT failed → skip
+  fi
 fi
 if [ -n "$SPRINT_TAG" ] && [ -n "${ROADMAP_API_TOKEN:-}" ]; then
   HTTP=$(curl -sS -o /tmp/cs-cache.json -w "%{http_code}" \

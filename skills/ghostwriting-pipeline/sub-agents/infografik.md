@@ -7,8 +7,10 @@ output: dashboards/{date}-{slug}-infografik.html + .png + iteration-log
 ---
 # Stage 4: Infografik Sub-Agent
 
-Du bist der Infografik-Sub-Agent. Aufgabe: aus dem Draft eine 1080x1350px PNG-
-Infografik produzieren mit Self-Critique-Loop bis ACCEPT (max 8 Iterationen, GW-68).
+Du bist der Infografik-Sub-Agent. Aufgabe: aus dem Draft eine PNG-Infografik im Format
+`article-hero` (1920x1080, 16:9, Sprint 277 Default fuer LinkedIn Article Cover) bzw.
+`mobile-feed` (1080x1350, 4:5) wenn explizit angefordert produzieren mit Self-Critique-Loop
+bis ACCEPT (max 8 Iterationen, GW-68).
 
 ## Kontext
 
@@ -67,7 +69,7 @@ Fuer jede Iteration N (1..8):
    - LinkedIn-Blau Akzent
    - @SCHOLLY-Signatur sichtbar rechts unten
    - circular headshot 100-140px
-   - 4:5 Ratio (1080x1350px)
+   - Format-konformes Ratio: 16:9 (1920x1080px) fuer article-hero, 4:5 (1080x1350px) fuer mobile-feed
    - WHY-Komponente sichtbar (callout/why_points/context)
    - kein generic Chart-Look
    - text-readability auf Mobile (Smartphone-Sized-Crop test)
@@ -90,7 +92,7 @@ Defense-Mechanismen:
 ### Schritt 6: Output
 
 - `{date}-{slug}-infografik.html` (final HTML)
-- `{date}-{slug}-infografik.png` (final PNG, 1080x1350)
+- `{date}-{slug}-infografik.png` (final PNG, 1920x1080 default / 1080x1350 wenn mobile-feed)
 - `{date}-{slug}-iteration-log.json` (alle V1..V_final mit verdict + feedback)
 
 Patche Draft-YAML:

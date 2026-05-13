@@ -1,0 +1,60 @@
+name: Auto-Release scholly-toolkit ZIP
+
+# Sprint 291 CC-SKILL-CLOUD-AUTO-DEPLOY — bei jedem Push zu main
+# bauen wir eine scholly-toolkit.zip und legen sie an einen rolling
+# Release "latest". Cloud-Sessions koennen dann via
+#   claude --plugin-url https://github.com/escholly-ship-it/scholly-toolkit/releases/latest/download/scholly-toolkit.zip
+# die aktuelle Version direkt fetchen — ohne manuellen ZIP-Upload.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**'
+      - 'hooks/**'
+      - 'scripts/**'
+      - 'skills/**'
+      - '.claude-plugin/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build scholly-toolkit.zip
+        run: |
+          set -euo pipefail
+          zip -r scholly-toolkit.zip \
+            agents/ hooks/ scripts/ skills/ .claude-plugin/ \
+            -x '*.DS_Store' '*/__pycache__/*' '*.pyc'
+          ls -la scholly-toolkit.zip
+          unzip -l scholly-toolkit.zip | tail -5
+
+      - name: Delete existing latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create rolling latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          gh release create latest scholly-toolkit.zip \
+            --title "scholly-toolkit ($SHA_SHORT)" \
+            --notes "Auto-release vom Commit $SHA_SHORT. Nutzung: \`claude --plugin-url https://github.com/escholly-ship-it/scholly-toolkit/releases/latest/download/scholly-toolkit.zip\`" \
+            --latest

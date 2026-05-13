@@ -1,39 +1,29 @@
-# scholly-toolkit ⚠️ DEPRECATED
+# scholly-toolkit
 
-> **DEPRECATED ab 2026-05-06 (Sprint 265).**
-> Dieser Repo ist nicht mehr der primaere Distributions-Pfad fuer Cloud-Sessions.
+Schollys Claude Code Marketplace — Sprint-Zeremonien (start/review/retro/sprint), Experten-Team als Agents, Enforcement-Hooks und Projekt-Tools.
 
-## Warum deprecated?
+## Nutzung in Cloud-Sessions (Sprint 291+)
 
-Nach dem Token-Leak-Postmortem (Sprint 261, 2026-05-01) wurde die Cloud-Architektur grundlegend umgebaut:
+Auto-Release via GitHub Actions. Bei jedem Push zu main wird `scholly-toolkit.zip` an die `latest`-Release angehaengt.
 
-**Vorher (was dieser Repo bediente):**
-- Cloud-Sessions installierten Plugin via `github:escholly-ship-it/scholly-toolkit` Marketplace
-- Brauchte Push-Token + Sync-Mechanismus zwischen `~/Cowork/scholly-toolkit/` und diesem Repo
-- Manuelle Pflege des Plugin-Marketplace-Repos
+```bash
+claude --plugin-url https://github.com/escholly-ship-it/scholly-toolkit/releases/latest/download/scholly-toolkit.zip
+```
 
-**Nachher (aktuelle Architektur, ab Sprint 259):**
-- Cloud-Bootstrap-Setup-Script clont `escholly-ship-it/cowork` direkt via `CLOUDE_GITHUB_TOKEN` (Fine-grained PAT, **read-only**, 90 Tage Expiration)
-- Cloud-Session sieht damit DIREKT `/workspace/cowork/scholly-toolkit/skills/` — alle Skills automatisch da
-- Kein separates Marketplace-Repo noetig
-- Schreib-Token bewusst nicht eingerichtet (Sicherheits-Haertung)
+Cloud-Sessions ziehen damit automatisch die aktuelle Skill-Version. Kein manueller ZIP-Upload zu claude.ai/customize/skills mehr noetig.
 
-## Wo ist die echte Source?
+## Lokal (Mac-Sessions)
 
-**Source-of-Truth:** `~/Cowork/scholly-toolkit/skills/` (lokal) — gespiegelt nach `https://github.com/escholly-ship-it/cowork` Subtree `scholly-toolkit/`.
+Source-of-Truth ist `~/Cowork/scholly-toolkit/` (privates Cowork-Repo). Lokal sichtbar via `~/.claude/skills/<name>` Symlinks. Aenderungen werden per local-mirror-hook nach Cowork synced + per Push hier hin gespiegelt.
 
-**Cloud-Pfad:** Bootstrap-Setup-Script (Memory: `sprint-259-cloud-bootstrap-prompt.md`) clont cowork → Skills sind nach `/workspace/cowork/scholly-toolkit/skills/` verfuegbar.
+## Struktur
 
-## Stand dieses Repos
+- `agents/` — Experten-Personas (backend-dev, content-stratege, devops, etc.)
+- `hooks/` — Enforcement-Hooks fuer Sprint-Phasen
+- `scripts/` — Plugin-Helper-Scripts
+- `skills/` — Slash-Commands (sprint, start, deploy-verify, etc.)
+- `.claude-plugin/` — Marketplace + Plugin-Manifests
 
-Letzter Sync war Sprint 265 (2026-05-06) als die Architektur noch nicht final korrigiert war — entspricht damit teilweise dem Source-of-Truth-Stand vom 2026-05-06 (16 Skills + sprint-planning + plugin.json v1.1.0). Es gibt **keinen Auto-Sync mehr** — bei Bedarf manueller Push.
+## Status
 
-## Cross-Refs
-
-- **Aktuelle Cloud-Architektur:** `escholly-ship-it/claude-config` Memory `sprint-259-cloud-bootstrap-prompt.md`
-- **Token-Leak-Postmortem:** `escholly-ship-it/claude-config` Memory `incident-2026-05-01-token-leak-postmortem.md`
-- **Sprint 265 Liefer-Doku:** `escholly-ship-it/claude-config` Memory `sprint-265-skills-cloud-distribution.md`
-
-## Maintainer
-
-Torsten Schollmayer · escholly@gmail.com · escholly-ship-it Org
+Aktiv. Sprint 291 (2026-05-13) re-aktiviert nach Sprint-265-Deprecation. Auto-Release-Loop loest die manuelle ZIP-Upload-Last.

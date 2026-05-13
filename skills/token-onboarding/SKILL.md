@@ -75,3 +75,61 @@ ueber das Bootstrap-Skript geliefert. Dieser Skill triggert in Cloud-Mode
 die folgende Anweisung an Scholly: **"Token in Mac-CLI-Session via
 `keychain_set` ablegen — Cloud-Sessions koennen erst nach naechstem Bootstrap
 darauf zugreifen."**
+
+---
+
+## 🔍 4c-Action-Verify-Matrix (Sprint 270 Block B — Anti-Annahme-Pattern)
+
+**PFLICHT bei JEDER Scholly-Action im Token-Lifecycle.** Wenn der Skill Scholly um eine manuelle Aktion bittet (Token via Keychain, BotFather, Vercel-Env, GitHub-Secret), darf er NICHT annehmen dass die Aktion fehlerlos ausgefuehrt wurde. Maschinelle Verifikation pflicht.
+
+### Action-Verify-Matrix (token-relevante Actions)
+
+| Scholly-Action mit Token | Maschinelle Verifikation | Loop-Verhalten |
+|--------------------------|--------------------------|----------------|
+| **Token in macOS Keychain abgelegt** | `security find-generic-password -s scholly.<service> -a <ACCOUNT>` → exit 0 | One-shot, max 1 Retry |
+| **Token von BotFather neu geholt (Telegram)** | curl `https://api.telegram.org/bot<TOKEN>/getMe` → 200 mit `{"ok":true,"result":{"username":...}}` | Loop bis 200, max 5x |
+| **Token in Vercel Env-Var (Production)** | `vercel env ls --scope=<team> -t <api-token>` → grep <var-name> in Production | Loop bis vorhanden |
+| **Token in GitHub Repo-Secret** | `gh secret list --repo <org>/<repo>` → grep <var-name> | One-shot |
+| **Token in GitHub Org-Secret** | `gh api orgs/<org>/actions/secrets` → grep | One-shot |
+| **Token in `~/.cloud-bootstrap-env`** | `grep -q "^export <VAR>=" ~/.cloud-bootstrap-env && [ -n "$(eval "echo \\$$VAR")" ]` | One-shot |
+| **Token gegen Vendor-Endpoint testen** | curl Endpoint mit `Authorization: Bearer <token>` → 200 vs 401/403 differenzieren | Loop bis 200, max 3x |
+| **Token rotiert (alt soll nicht mehr funktionieren)** | curl Endpoint mit ALTEM Token → 401 erwartet (NICHT 200) | One-shot, fail wenn 200 |
+
+### Generischer Loop-Pattern (analog deploy-verify Skill)
+
+```bash
+verify_token_action() {
+  local DESC="$1"      # z.B. "Telegram-Bot-Token via BotFather"
+  local CMD="$2"       # z.B. "curl -sS https://api.telegram.org/bot$TG/getMe"
+  local EXPECT="$3"    # z.B. '"ok":true'
+  local MAX_TRIES="${4:-5}"
+  local SLEEP="${5:-5}"
+
+  for i in $(seq 1 $MAX_TRIES); do
+    OUTPUT=$(eval "$CMD" 2>&1)
+    if echo "$OUTPUT" | grep -q "$EXPECT"; then
+      echo "  ✅ $DESC verifiziert (Versuch $i)"
+      return 0
+    fi
+    [ "$i" = "$MAX_TRIES" ] && break
+    echo "  ⏳ $DESC noch nicht verifiziert (Versuch $i/$MAX_TRIES), warte ${SLEEP}s..."
+    sleep "$SLEEP"
+  done
+
+  echo "  ❌ $DESC NICHT verifiziert nach $MAX_TRIES Versuchen — Scholly fragen oder Gap dokumentieren"
+  return 1
+}
+```
+
+### Anti-Annahme-Prinzip
+
+- Jede Token-Onboarding-Aktion endet mit einer Verifikation gegen den Vendor-Endpoint (200 mit Bearer-Token).
+- "Scholly hat es eingetragen" reicht NICHT — der Endpoint muss antworten.
+- Bei Token-Rotation: alter Token MUSS 401 liefern (Negativ-Verify), sonst ist die Rotation nicht durch.
+- Wenn Verify-Methode fehlt → Scholly fragen + Gap im Onboarding-Output dokumentieren.
+
+### Cross-Ref
+
+- Master-Doc: `memory/refactor-architektur-sprint-refactor-1.md` (Block B Action-Verify-Matrix kanonisch)
+- Deploy-Verify Skill nutzt gleiche Matrix-Struktur (deploy-relevante Actions)
+- Beispiel Token-Leak-Postmortem 2026-05-01: `incident-2026-05-01-token-leak-postmortem.md`
