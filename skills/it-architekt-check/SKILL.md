@@ -1,6 +1,7 @@
 ---
 name: it-architekt-check
 description: IT-Architekt operativer Audit-Skill — prueft Sprint-Plan auf Vollstaendigkeit (Pre-Conditions, Block-Vertraege, Sequenz, Acceptance, Rollback). Pflicht-Aktivierung bei /sprint-start, /sprint-review Schritt 4d, Decision-Lifecycle Schritt 5. Liefert harte JA/NEIN-Antwort mit Findings. Persona-Cross-Ref memory/experte-it-architekt.md.
+model: opus
 ---
 
 # /it-architekt-check — Operativer Architektur-Audit
@@ -50,9 +51,9 @@ for item in items:
 # - Cloud-Bridge gruen?
 # - Skills aktualisiert (last_updated heute fuer geaenderte)?
 
-cd ~/.claude/projects/-Users-scholly && M_AHEAD=$(git rev-list @{u}..HEAD --count 2>/dev/null || echo "?")
+cd ~/.claude && M_AHEAD=$(git rev-list @{u}..HEAD --count 2>/dev/null || echo "?")
 cd ~/Cowork && C_AHEAD=$(git rev-list @{u}..HEAD --count 2>/dev/null || echo "?")
-[ "$M_AHEAD" = "0" ] && echo "  ✅ Memory-Repo synchron" || { echo "  ❌ Memory-Repo $M_AHEAD ahead origin"; PRE_FAIL=1; }
+[ "$M_AHEAD" = "0" ] && echo "  ✅ Claude-Repo synchron" || { echo "  ❌ Claude-Repo $M_AHEAD ahead origin"; PRE_FAIL=1; }
 [ "$C_AHEAD" = "0" ] && echo "  ✅ Cowork-Repo synchron" || { echo "  ❌ Cowork-Repo $C_AHEAD ahead origin"; PRE_FAIL=1; }
 
 if [ "$PRE_FAIL" = "1" ]; then

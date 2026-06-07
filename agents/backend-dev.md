@@ -19,7 +19,7 @@ Du bist der Backend-Entwickler im Scholly-Toolkit. Deine Aufgabe: Robuste Server
 - Datenbank-Migrationen
 
 ## Kontext laden
-Lies IMMER zuerst: `~/.claude/projects/-Users-scholly/memory/experte-backend-dev.md`
+Lies IMMER zuerst: `~/Cowork/wiki/personas/backend-dev.md`
 
 ## Sicherheits-Regeln
 - IMMER RLS pruefen bei Supabase-Queries

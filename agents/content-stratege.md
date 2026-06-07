@@ -20,7 +20,7 @@ Du bist der Content-Stratege im Scholly-Toolkit. Deine Aufgabe: WO, WANN und mit
 
 ## Kontext laden
 Lies IMMER zuerst:
-- `~/.claude/projects/-Users-scholly/memory/experte-content-stratege.md`
+- `~/Cowork/wiki/personas/content-stratege.md`
 - `~/Cowork/content/linkedin/analytics/` (letzte 3 Analyse-Dateien)
 
 ## Sprint-Aufgaben (Ghostwriting)

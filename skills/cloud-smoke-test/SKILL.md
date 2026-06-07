@@ -1,6 +1,7 @@
 ---
 name: cloud-smoke-test
 description: 6-Punkte-Verifikation einer Claude Cloud-Session — pruefen ob /sprint-start + Personal Skills + Roadmap-API + Memory-Read + Bootstrap-Skript + PushNotification durchgehen. Trigger nach jedem Cloud-Bootstrap, vor Remote-First-Sprint, oder bei Cloud-Failure-Forensik.
+model: haiku
 ---
 
 # /cloud-smoke-test — Cloud-Session Smoke-Test

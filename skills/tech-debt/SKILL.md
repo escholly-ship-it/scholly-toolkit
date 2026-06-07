@@ -1,6 +1,7 @@
 ---
 name: tech-debt
 description: Aggregiert Technische Schulden ueber alle Projekte (TODO/FIXME/HACK-Kommentare + Backlog-[TECH-DEBT]-Tags + God-Components) und erzeugt einen priorisierten Refactor-Plan. Trigger bei "tech debt", "refactor plan", "TODO scan", "schulden inventar", "tech debt audit". Nutzt Regel 4 (Schulden = Null vor neuen Features) als STOPP-Gate fuer Phase A.
+model: haiku
 ---
 
 # /tech-debt — Tech-Debt-Aggregation + Refactor-Plan
@@ -30,7 +31,7 @@ bash ~/.claude/skills/tech-debt/scripts/tech-debt-scan.py
 
 Scannt:
 - Source-Verzeichnisse: `~/projects/*/src`, `~/projects/*/scripts`
-- Memory-Backlogs: `~/.claude/projects/-Users-scholly/memory/backlog-*.md`
+- Wiki-Backlogs: `~/Cowork/wiki/projects/*-backlog.md` (Welt-V2 canonical seit Phase I 2026-05-22)
 - Patterns: `TODO`, `FIXME`, `HACK`, `XXX`, `[TECH-DEBT]`, `[SCHULDEN]`
 
 Output: JSON-Report unter `/tmp/tech-debt-scan-<sprint>.json`.

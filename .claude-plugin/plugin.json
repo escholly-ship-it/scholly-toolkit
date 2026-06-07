@@ -1,6 +1,6 @@
 {
   "name": "scholly-toolkit",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Sprint-Zeremonien, Experten-Team, Enforcement-Gates und Projekt-Management fuer Schollys Workflows",
   "author": {
     "name": "Torsten Schollmayer",
@@ -14,7 +14,6 @@
     "deployment"
   ],
   "skills": "./skills",
-  "hooks": "./hooks/hooks.json",
   "agents": [
     "./agents/devops-experte.md",
     "./agents/knowledge-manager.md",

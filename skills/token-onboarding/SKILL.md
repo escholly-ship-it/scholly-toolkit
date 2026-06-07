@@ -67,6 +67,30 @@ Aktiviere diesen Skill, sobald:
   Session-Env. Dieser Skill ist deshalb primaer fuer Mac-CLI-Sessions —
   Cloud-Sessions sehen die Tokens schon ueber das Bootstrap.
 
+## Vercel-PAT-Rotation (CC-VERCEL-PAT-ROTATION-PIPELINE, Sprint 293)
+
+Wenn Scholly einen frischen Vercel-Account-PAT minted (vercel.com/account/tokens
+→ Create Token, Scope: full account):
+
+```bash
+source ~/.claude/skills/token-onboarding/scripts/token-onboarding.sh
+keychain_set scholly.vercel VERCEL_MGMT_TOKEN
+# → read -s prompt
+
+# Validity-Probe + Sync zu allen Targets in einem Schritt:
+bash ~/Cowork/scripts/vercel-pat-sync.sh --apply
+```
+
+Das Sync-Skript:
+1. Liest aus Keychain (`scholly.vercel` / `VERCEL_MGMT_TOKEN`).
+2. Probe gegen `/v2/user` (Hard-Stop bei 401/403 — invaliden Token niemals propagieren).
+3. Push 1: `gh secret set VERCEL_TOKEN -R escholly-ship-it/cowork` (GHA vercel-env-drift-audit liest dies).
+4. Push 2: `vercel env add VERCEL_MGMT_TOKEN production` im roadmap-Projekt (vendor-rotate liest dies).
+
+Validity-Probe als Pre-Flight in `~/Cowork/scripts/vercel-env-drift-audit.sh` +
+`~/Cowork/.github/workflows/vercel-env-drift-audit.yml` verhindert silent-rot
+(siehe Sprint 292 Inzident: 8 Tage rote Workflows + jq `.projects[].id` null-Iter).
+
 ## Cloud-Mode Bridge
 
 In Cloud-Sessions ist `security` nicht verfuegbar. Tokens werden ueber den
@@ -88,8 +112,8 @@ darauf zugreifen."**
 |--------------------------|--------------------------|----------------|
 | **Token in macOS Keychain abgelegt** | `security find-generic-password -s scholly.<service> -a <ACCOUNT>` → exit 0 | One-shot, max 1 Retry |
 | **Token von BotFather neu geholt (Telegram)** | curl `https://api.telegram.org/bot<TOKEN>/getMe` → 200 mit `{"ok":true,"result":{"username":...}}` | Loop bis 200, max 5x |
-| **Token in Vercel Env-Var (Production)** | `vercel env ls --scope=<team> -t <api-token>` → grep <var-name> in Production | Loop bis vorhanden |
-| **Token in GitHub Repo-Secret** | `gh secret list --repo <org>/<repo>` → grep <var-name> | One-shot |
+| **Token in Vercel Env-Var (Production)** | `vercel env ls --scope=<team> -t <api-token>` → grep [var-name] in Production | Loop bis vorhanden |
+| **Token in GitHub Repo-Secret** | `gh secret list --repo <org>/<repo>` → grep [var-name] | One-shot |
 | **Token in GitHub Org-Secret** | `gh api orgs/<org>/actions/secrets` → grep | One-shot |
 | **Token in `~/.cloud-bootstrap-env`** | `grep -q "^export <VAR>=" ~/.cloud-bootstrap-env && [ -n "$(eval "echo \\$$VAR")" ]` | One-shot |
 | **Token gegen Vendor-Endpoint testen** | curl Endpoint mit `Authorization: Bearer <token>` → 200 vs 401/403 differenzieren | Loop bis 200, max 3x |

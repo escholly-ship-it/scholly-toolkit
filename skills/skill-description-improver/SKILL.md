@@ -31,11 +31,11 @@ LLM bekommt aktuelle Description + Eval-Failures. Generiert verbesserte Descript
 
 ### Step 4 — Output
 
-Vorher/Nachher-Diff in `~/.claude/skills/<skill>/eval-results/<date>.md`. Frontmatter-Patch via Edit-Tool.
+Vorher/Nachher-Diff in `~/.claude/skills/[skill]/eval-results/<date>.md`. Frontmatter-Patch via Edit-Tool.
 
 ### Step 5 — Persist
 
-PR mit Diff in claude-config-Repo, Commit-Message: "Skill description tuning <skill>: <hit-rate-before>→<hit-rate-after>".
+PR mit Diff in claude-config-Repo, Commit-Message: "Skill description tuning [skill]: [hit-rate-before]→[hit-rate-after]".
 
 ## Sprint 262 Anwendung
 

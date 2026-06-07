@@ -10,7 +10,7 @@
     {
       "name": "scholly-toolkit",
       "description": "Sprint-Zeremonien (start/review/retro), Experten-Team als Agents, Enforcement-Hooks, /deploy-verify, /design-gate, /roadmap",
-      "version": "1.0.0",
+      "version": "1.2.1",
       "source": "./",
       "category": "productivity",
       "homepage": "https://github.com/escholly-ship-it/cowork"

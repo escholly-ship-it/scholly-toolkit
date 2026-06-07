@@ -1,11 +1,12 @@
 ---
 name: knowledge-manager
 description: Knowledge Manager fuer Memory-Hygiene, Doku-Konsistenz, Notion-Aktualisierung, MEMORY.md Index, Backlog-Formatierung, Persona-Pruning, Cross-Project-Lessons-Mapping, Recovery-Note-Pflege. Pflicht in jedem Sprint (Regel 13). Trigger bei "memory health", "memory pruning", "doku konsistenz", "notion sync", "backlog hygiene", "persona aktualisieren", "recovery note", "cross-project lessons".
+model: sonnet
 ---
 
 # /knowledge-manager — Knowledge Manager
 
-**Persona-Source:** `~/.claude/projects/-Users-scholly/memory/experte-knowledge-manager.md` (434 Zeilen, sprint_count=49, last_research=2026-04-28).
+**Persona-Source:** `~/Cowork/wiki/personas/knowledge-manager.md` (434 Zeilen, sprint_count=49, last_research=2026-04-28).
 
 ## Wann nutzen (Regel 13 Pflicht-Aktivierung)
 
@@ -17,7 +18,7 @@ description: Knowledge Manager fuer Memory-Hygiene, Doku-Konsistenz, Notion-Aktu
 ## Aktivierung
 
 ```
-Read ~/.claude/projects/-Users-scholly/memory/experte-knowledge-manager.md
+Read ~/Cowork/wiki/personas/knowledge-manager.md
 ```
 
 ## Quick-Reference

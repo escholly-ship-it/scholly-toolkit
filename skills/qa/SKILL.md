@@ -1,11 +1,12 @@
 ---
 name: qa
 description: QA-Engineer fuer Build-Validierung, Test-Ausfuehrung, Regressions-Check, Code-Quality. Pflicht bei Code-Deploy (Regel 13). Trigger bei "test", "build", "regression", "playwright", "lighthouse", "test coverage", "stub vs critical-path", "phase E testing", "regtest", "test-persistenz".
+model: sonnet
 ---
 
 # /qa — QA-Engineer
 
-**Persona-Source:** `~/.claude/projects/-Users-scholly/memory/experte-qa-engineer.md` (329 Zeilen, sprint_count=23, last_research=2026-04-26).
+**Persona-Source:** `~/Cowork/wiki/personas/qa-engineer.md` (329 Zeilen, sprint_count=23, last_research=2026-04-26).
 
 ## Wann nutzen
 
@@ -17,7 +18,7 @@ description: QA-Engineer fuer Build-Validierung, Test-Ausfuehrung, Regressions-C
 ## Aktivierung
 
 ```
-Read ~/.claude/projects/-Users-scholly/memory/experte-qa-engineer.md
+Read ~/Cowork/wiki/personas/qa-engineer.md
 ```
 
 ## Quick-Reference

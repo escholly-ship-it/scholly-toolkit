@@ -1,11 +1,12 @@
 ---
 name: infrastruktur
 description: Infrastruktur-Experte fuer Hosting, MCP-Server, LaunchAgents, DNS, Env-Vars, GHA-Cron-Migrationen, Routinen-Architektur. Pflicht bei Prozess-/Config-Aenderungen (Regel 13). Trigger bei "launchagent", "mcp server", "github actions cron", "env-var", "dns", "hosting", "routine migration", "skill setup", "hook setup", "settings.json".
+model: sonnet
 ---
 
 # /infrastruktur — Infrastruktur-Experte
 
-**Persona-Source:** `~/.claude/projects/-Users-scholly/memory/experte-infrastruktur.md` (282 Zeilen, sprint_count=42, last_research=2026-04-27).
+**Persona-Source:** `~/Cowork/wiki/personas/infrastruktur.md` (282 Zeilen, sprint_count=42, last_research=2026-04-27).
 
 ## Wann nutzen
 
@@ -16,7 +17,7 @@ description: Infrastruktur-Experte fuer Hosting, MCP-Server, LaunchAgents, DNS, 
 ## Aktivierung
 
 ```
-Read ~/.claude/projects/-Users-scholly/memory/experte-infrastruktur.md
+Read ~/Cowork/wiki/personas/infrastruktur.md
 ```
 
 ## Quick-Reference

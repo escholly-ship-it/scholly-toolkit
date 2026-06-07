@@ -20,7 +20,7 @@ Du bist der Content-&-Copy-Experte im Scholly-Toolkit. Deine Aufgabe: Text in Sc
 
 ## Kontext laden
 Lies IMMER zuerst:
-- `~/.claude/projects/-Users-scholly/memory/experte-content-copy.md`
+- `~/Cowork/wiki/personas/content-copy.md`
 - `~/Cowork/content/persona-scholly.md` (bei Ghostwriting)
 
 ## Sprint-Aufgaben (Ghostwriting)

@@ -26,15 +26,51 @@ Lokal: bestehender Block laeuft.
 
 **Git-Status (lokal):** !`git log --oneline -3 2>/dev/null || echo "Kein Git-Repo"`
 
+## Frame-Check VOR jedem Deploy-Verify (Lehre 2026-05-23 Token-Trust-Architecture)
+
+**Erste Frage im Plan-Akt:** Ist das Vorhaben ein **Doktrin-Refactor**, ein **Pipeline-Deploy** oder **beides**?
+- Bei "Doktrin-Refactor": Konsistenz-Check der Source-Dateien reicht.
+- Bei "Pipeline-Deploy": Live-Target-Verify pflicht.
+- Bei "beides" (typisch fuer Pivots): BEIDE Verify-Pfade muessen vor Klick-Anker-2 (Abnahme) gelaufen sein.
+
+**Zweite Frage:** Welche Deploy-Topologie hat die geaenderte Komponente?
+- Code im Web-App-Repo → Auto-Deploy via Git-Push (Vercel)
+- Config-File einer Cloud-Routine → **MANUELLER Routinen-UI-Sync** + Test-Trigger (siehe Cloud-Routinen-Tabelle unten)
+- Supabase-Schema → Manueller Supabase-CLI-Apply
+- LaunchAgent / MCP-Server / Hook → Lokaler Restart + Verify
+
+**Anti-Annahme-Default:** Source-Edit ≠ Live-Deploy. Bei jedem Pivot Source-vs-Live-Sync explizit verifizieren.
+
 ## Pflicht nach JEDEM git push der Auto-Deploy triggert (Regel 16)
 
-### Bekannte Production-URLs
+### Bekannte Cloud-Routinen-Live-Targets (Anthropic claude.ai/code/routines)
+
+Cloud-Routinen-Prompts leben im **claude.ai/code/routines-UI**, NICHT in den lokalen `managed-agents/*.json`-Dateien. JSON-Edits erreichen die Routine NICHT automatisch — manueller UI-Sync ist pflicht.
+
+| Routine | Live-UI-URL | Source-of-Truth (NIE eine als Legacy markierte JSON) | Verify-Pfad |
+|---|---|---|---|
+| LinkedIn-Draft (Ghostwriting **v9**) | `https://claude.ai/code/routines/trig_01CRGQsB4zciwSGFLQmrkc8U` | **Live-Prompt IST Source-of-Truth** + `~/Cowork/memory/canonical-ghostwriting.md` (v9-Doktrin). `managed-agents/ghostwriting-agent.json` ist **v8-LEGACY — NICHT zum Sync/Diff verwenden** (sonst wird der v8-Prompt faelschlich ueber die aktive v9-Routine kopiert) | `RemoteTrigger.get` (oder Chrome-MCP) → Live-Prompt-Content gegen v9-Doktrin pruefen (Vier-Bewegungen, SR-V9, story-first/kein-Namens-Vorspann) → `RemoteTrigger.run` Test → SR-V9-Output + `routine_outcomes` pruefen |
+| (weitere Cloud-Routinen ergaenzen sobald deployed) | | | |
+
+**Verify-Sequenz fuer Cloud-Routinen-Edits (PFLICHT bei jedem System-Prompt-Touch):**
+
+1. **Vor Edit:** `get_page_text` der Routinen-Detail-Seite → Backup des aktuellen Live-Prompts (fuer Rollback)
+2. **Edit:** Edit-Pencil oben rechts → Cmd+A + Delete im Instructions-Textarea → pbcopy Source → Cmd+V → Save
+3. **Nach Edit Verify-Pass:** Routinen-Detail-Seite reload → Instructions-Header gegen die **Source-of-Truth-Spalte** diffen (NIE gegen eine als v8-Legacy markierte JSON — sonst wird ein veralteter Prompt ueber die aktive Routine kopiert), mindestens erste 3 Zeilen + letzte Lessons-Sektion
+4. **Test-Trigger:** `Run now` Button → Live-Session in neuem Tab oeffnen
+5. **Frueh-Diagnostik Stage 1.5:** Falls Pipeline mehrstufig — pruefen ob fruehe Stages der neuen Doktrin folgen (z.B. v8 Coin-Flip vs v7 Tier-Scan)
+6. **Bei Schwellenbruch:** Rollback auf Live-Prompt-Backup, Forensik dokumentieren, ERST DANN re-iterieren
+
+### Bekannte Production-URLs (Vercel)
 | Projekt | URL | Health-Endpoint |
 |---------|-----|-----------------|
 | Trainerbank | trainerbank.vercel.app | /api/health |
 | Kaderplaner | kaderplaner.vercel.app | /api/health |
 | Co-Trainer | trainingsplaner-lyart.vercel.app | /api/health |
 | Cookmark | (wenn deployed) | /api/health |
+| Ghostwriting-Dashboard | ghostwriting-dashboard.vercel.app | /api/health |
+
+**Anti-Pattern (Codex-Review-Lehre 2026-05-23, PR #113):** **POST-Endpoints mit Side-Effects sind KEINE Health-Endpoints.** Beispiel `ghostwriting-dashboard/api/draft-insert` — POST-only, schreibt in Supabase. GET dagegen scheitert (falsches Negativ), POST gegen Production wuerde bei jedem Health-Check einen Draft einfuegen. Health-Endpoint-Auswahl-Kriterien: **idempotent + GET + statusless + ohne DB-Writes.** Wenn der einzige existierende API-Endpoint mutierend ist, einen `/api/health` dedizierten GET-Endpoint nachruesten statt den mutierenden zu missbrauchen. Cross-Ref: persona devops "Erlerntes Wissen" 2026-05-23.
 
 ### Verifikations-Schritte
 1. **Warten** bis Vercel-Deployment abgeschlossen ist
@@ -191,6 +227,22 @@ verify_action() {
 - Wenn Verify-Methode existiert → IMMER ausfuehren, nie vertrauen.
 - Wenn Verify-Methode fehlt → Scholly fragen + Gap im Deploy-Verify-Output dokumentieren.
 - KEIN Skill-Skript darf "Scholly hat es gemacht" annehmen ohne Verify-Bestaetigung.
+
+### UI-Text-Verify — DOM-Volltext statt accessibility tree (Sprint 294)
+
+**Pflicht-Pfad fuer "ist Text/Heading/Marker auf Seite":**
+
+```js
+// Browser-MCP evaluate (Playwright/Chrome) — primaer
+document.body.innerText.match(/<pattern>/g)?.length >= <erwartete_anzahl>
+```
+
+**Fallback nur bei JS-Blockade** (CSP, OAuth-Wall, iframe-cross-origin):
+- `find(text=...)` / `snapshot()` / `get_page_text()` — und WARUM-Begruendung in Verify-Output.
+
+**Grund:** `find()` arbeitet auf accessibility tree. Custom-Components droppen ARIA-roles + Tree-Provider capped bei >500 Nodes → falsch-negativ trotz vorhandenem DOM-Inhalt. `innerText` liest gerenderten DOM-Text, unabhaengig von Rolle/Cap.
+
+**Inzident-Quelle:** Sprint 270 Phase 3 (2026-05-07 16:50) — `find()` not-found fuer ZIP-Verify-Loop heading, `innerText.match` 4 Matches. Methodik-Praezisierung statt Anti-Pattern-Repeat.
 
 ### Cross-Ref
 

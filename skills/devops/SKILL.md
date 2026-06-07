@@ -1,11 +1,12 @@
 ---
 name: devops
 description: DevOps-Experte fuer Deployments, Production-Verifikation, CI/CD, Monitoring, Vercel/Supabase/Anthropic-Quota. Pflicht in jedem Sprint mit Code-Touch (Regel 13). Trigger bei "deploy verify", "production deploy", "vercel quota", "supabase migration", "github actions", "ci/cd", "monitoring", "cloud-hobby-tier", "active cpu".
+model: sonnet
 ---
 
 # /devops — DevOps-Experte
 
-**Persona-Source:** `~/.claude/projects/-Users-scholly/memory/experte-devops.md` (303 Zeilen, sprint_count=53, last_research=2026-05-01).
+**Persona-Source:** `~/Cowork/wiki/personas/devops.md` (303 Zeilen, sprint_count=53, last_research=2026-05-01).
 
 ## Wann nutzen (Regel 13 Pflicht-Aktivierung)
 
@@ -16,7 +17,7 @@ description: DevOps-Experte fuer Deployments, Production-Verifikation, CI/CD, Mo
 ## Aktivierung
 
 ```
-Read ~/.claude/projects/-Users-scholly/memory/experte-devops.md
+Read ~/Cowork/wiki/personas/devops.md
 ```
 
 ## Quick-Reference

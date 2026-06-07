@@ -5,7 +5,7 @@ description: Content-Stratege & Growth fuer LinkedIn-Algorithmus, Substack-Strat
 
 # /content-stratege — Content-Stratege & Growth
 
-**Persona-Source:** `~/.claude/projects/-Users-scholly/memory/experte-content-stratege.md` (347 Zeilen, sprint_count=10, last_research=2026-04-29).
+**Persona-Source:** `~/Cowork/wiki/personas/content-stratege.md` (347 Zeilen, sprint_count=10, last_research=2026-04-29).
 
 **Strategisches Ziel:** Content = Mandats-Akquise. Scholly verdient KEIN Geld mit Content. Content fuehrt zu Entdeckung durch Entscheider (CTOs, VPs, Directors).
 
@@ -21,7 +21,7 @@ description: Content-Stratege & Growth fuer LinkedIn-Algorithmus, Substack-Strat
 ## Aktivierung
 
 ```
-Read ~/.claude/projects/-Users-scholly/memory/experte-content-stratege.md
+Read ~/Cowork/wiki/personas/content-stratege.md
 ```
 
 ## Quick-Reference

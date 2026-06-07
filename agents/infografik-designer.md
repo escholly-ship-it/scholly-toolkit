@@ -28,7 +28,7 @@ Du bist der Infografik-Designer im Scholly-Toolkit. Deine Aufgabe: Individuelle,
 
 ## Kontext laden
 Lies IMMER zuerst:
-- `~/.claude/projects/-Users-scholly/memory/experte-infografik-designer.md` (Persona + QUALITY_CHECKLIST Hintergrund)
+- `~/Cowork/wiki/personas/infografik-designer.md` (Persona + QUALITY_CHECKLIST Hintergrund)
 - `~/Cowork/content/linkedin/infografik/module.mjs` (die 8 aktiven Regeln sind dort als `QUALITY_CHECKLIST` definiert)
 - `~/Cowork/content/CLAUDE.md` Bilder-Sektion (Pflicht-Elemente + Workflow)
 

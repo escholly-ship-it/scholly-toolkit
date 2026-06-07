@@ -39,8 +39,8 @@ In der Ghostwriting-Daily-Routine als Stage 4 (Infografik). Kein Standalone-Trig
 ## Pflicht-Lese-Material vor Aktivierung
 
 Skill MUSS am Anfang lesen:
-1. `~/.claude/projects/-Users-scholly/memory/experte-infografik-designer.md` — Persona, 8-Schritt-Workflow, QS-Checkliste, Mobile-Schriftgrößen-Minima
-2. `~/.claude/projects/-Users-scholly/memory/experte-content-stratege.md` — Pillar-Strategie, Voice
+1. `~/Cowork/wiki/personas/infografik-designer.md` — Persona, 8-Schritt-Workflow, QS-Checkliste, Mobile-Schriftgrößen-Minima
+2. `~/Cowork/wiki/personas/content-stratege.md` — Pillar-Strategie, Voice
 3. `~/Cowork/content/persona-scholly.md` — Tonality + Visual-Brand
 4. `~/Cowork/content/linkedin/infografik/module.mjs` — `QUALITY_CHECKLIST` (8 Regeln) + Format-Definitionen
 
@@ -267,5 +267,5 @@ Detailliert in `~/projects/ghostwriting-dashboard/src/app/draft-view.tsx`.
 ## Cross-Refs
 
 - `~/Cowork/content/linkedin/infografik/module.mjs` — `buildSvgBrief`, `QUALITY_CHECKLIST`, `resolveLoopVerdict`, `isConvergenceStagnation`
-- `~/.claude/projects/-Users-scholly/memory/experte-infografik-designer.md` — Persona-Doc
-- `~/.claude/projects/-Users-scholly/memory/audit-2026-05-08-ghostwriting-cleanup.md` — Sprint-277-Refactor-Forensik
+- `~/Cowork/wiki/personas/infografik-designer.md` — Persona-Doc
+- `~/Cowork/wiki/raw/legacy-memory/audit-2026-05-08-ghostwriting-cleanup.md` — Sprint-277-Refactor-Forensik (historisch, im /raw-Legacy-Snapshot)
